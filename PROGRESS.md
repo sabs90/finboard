@@ -17,12 +17,12 @@ Last updated: 2026-06-03
 - [x] `scripts/ingest_frollo.py` — parses Frollo CSV, deduplicates, loads transactions
 - [x] Tested: fresh DB load ✓
 - [x] Tested: duplicate CSV re-import (idempotent) ✓ — db_init re-run inserts 0 rows
-- [ ] Tested: malformed row handling ✓ — needs real Frollo CSV
+- [x] Tested: malformed row handling ✓ — 0 errors on 3362-row real CSV
 - [x] `.env.example` written (at `config/.env.example`)
 - [x] `.gitignore` configured (excludes `.env`, `data/`, `*.db`)
-- [ ] First real Frollo export imported successfully
+- [x] First real Frollo export imported successfully — 3361 inserted, 1 duplicate caught, 0 errors
 
-**Phase 1 complete**: [ ] — pending first real CSV import test
+**Phase 1 complete**: [x]
 
 ---
 
@@ -136,8 +136,11 @@ Last updated: 2026-06-03
 - Built `scripts/ingest_frollo.py` — CSV parsing with multi-format date support, column aliasing across Frollo export versions, `INSERT OR IGNORE` deduplication, account auto-creation, unmapped category warnings
 - Added `.gitignore` and `config/.env.example`
 - Repo initialised and pushed to GitHub
-- **Blocker**: malformed-row and real-CSV tests pending — need a Frollo export to validate end-to-end
-- **Next session**: Drop a Frollo CSV into `data/exports/frollo/` and run `python3 scripts/ingest_frollo.py`; then start Phase 2 or Phase 3
+- Fixed column name mismatches against real Frollo export (transaction_date, category_name, merchant_name, user_tags, posted_date)
+- Rebuilt categories.json with all 48 real Frollo category names; 0 unmapped on first real import
+- Verified: 3361/3362 rows inserted on first run, 0 on re-run; accounts auto-created (HSBC EVERYDAY, ANZ Offset, Investment Loan)
+- **Phase 1 complete ✓**
+- **Next session**: Phase 3 (Next.js dashboard shell) — get the data visible; or Phase 2 (Sharesight) if Sharesight API credentials are ready
 
 ---
 
