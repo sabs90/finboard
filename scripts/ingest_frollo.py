@@ -7,9 +7,11 @@ the database, and inserts new transactions.
 Usage:
     python scripts/ingest_frollo.py [--file path/to/specific.csv]
 
-Frollo CSV columns (as of 2026):
-    Date, Amount, Description, Merchant Name, Category, Account Name,
-    Account Number, Status, Note, Tags, Transaction ID
+Frollo CSV columns (confirmed format as of 2026-06):
+    transaction_id, description, user_description, amount, currency,
+    transaction_date, posted_date, account_number, account_name,
+    credit_debit, transaction_type, provider_name, merchant_name,
+    budget_category, category_name, user_tags, notes, included
 
 The script is safe to re-run on the same files — deduplication is enforced
 at the database level via a unique index on (account_id, date, amount, description).
@@ -38,13 +40,14 @@ logger = get_logger("ingest_frollo")
 @dataclass
 class FrolloRow:
     date: str
+    posted_date: Optional[str]
     amount_cents: int
     description: str
     merchant: Optional[str]
     frollo_category: Optional[str]
+    transaction_type: Optional[str]
     account_name: str
     account_number: Optional[str]
-    status: Optional[str]
     notes: Optional[str]
     tags: Optional[str]
     transaction_id: Optional[str]
@@ -95,9 +98,13 @@ def resolve_category(
     child_name = mapping.get("child")
 
     parent_id = category_lookup.get(f"{parent_name}|") if parent_name else None
-    child_id = category_lookup.get(f"{parent_name}|{child_name}") if child_name else parent_id
 
-    return child_id or parent_id or uncategorised_id, parent_id, is_transfer
+    if child_name:
+        child_id = category_lookup.get(f"{parent_name}|{child_name}")
+        return child_id or parent_id or uncategorised_id, parent_id, is_transfer
+    else:
+        # No child → store at parent level; parent_category_id is null
+        return parent_id or uncategorised_id, None, is_transfer
 
 
 # ── Account helpers ───────────────────────────────────────────────────────────
@@ -158,17 +165,19 @@ def _infer_account_type(account_name: str) -> str:
 
 # Known column name variants across Frollo export versions
 _COL_MAP = {
-    "date":             ["Date", "Transaction Date", "date"],
-    "amount":           ["Amount", "amount"],
-    "description":      ["Description", "description", "Transaction Description"],
-    "merchant":         ["Merchant Name", "Merchant", "merchant"],
-    "category":         ["Category", "category", "Frollo Category"],
-    "account_name":     ["Account Name", "Account", "account_name"],
-    "account_number":   ["Account Number", "BSB/Account Number", "account_number"],
-    "status":           ["Status", "status"],
-    "note":             ["Note", "Notes", "note"],
-    "tags":             ["Tags", "tags"],
-    "transaction_id":   ["Transaction ID", "ID", "transaction_id"],
+    "date":             ["transaction_date", "Date", "Transaction Date", "date"],
+    "posted_date":      ["posted_date", "Posted Date"],
+    "amount":           ["amount", "Amount"],
+    "description":      ["description", "Description", "Transaction Description"],
+    "merchant":         ["merchant_name", "Merchant Name", "Merchant", "merchant"],
+    "category":         ["category_name", "Category", "category", "Frollo Category"],
+    "transaction_type": ["transaction_type"],
+    "account_name":     ["account_name", "Account Name", "Account"],
+    "account_number":   ["account_number", "Account Number", "BSB/Account Number"],
+    "note":             ["notes", "Note", "Notes", "note"],
+    "tags":             ["user_tags", "Tags", "tags"],
+    "transaction_id":   ["transaction_id", "Transaction ID", "ID"],
+    "included":         ["included"],
 }
 
 
@@ -202,6 +211,10 @@ def parse_csv(path: Path) -> list[FrolloRow]:
 
         for line_num, raw in enumerate(reader, start=2):
             try:
+                # Skip rows explicitly excluded by Frollo
+                if cols["included"] and raw.get(cols["included"], "true").strip().lower() == "false":
+                    continue
+
                 date_str = _parse_date(raw.get(cols["date"], "").strip())
                 amount_cents = _parse_amount(raw.get(cols["amount"], "").strip())
                 description = raw.get(cols["description"], "").strip()
@@ -211,15 +224,20 @@ def parse_csv(path: Path) -> list[FrolloRow]:
                     logger.warning("Line %d: missing required field — skipping", line_num)
                     continue
 
+                posted_date_str = None
+                if cols["posted_date"]:
+                    posted_date_str = _parse_date(raw.get(cols["posted_date"], "").strip())
+
                 rows.append(FrolloRow(
                     date=date_str,
+                    posted_date=posted_date_str,
                     amount_cents=amount_cents,
                     description=description,
                     merchant=_get_optional(raw, cols["merchant"]),
                     frollo_category=_get_optional(raw, cols["category"]),
+                    transaction_type=_get_optional(raw, cols["transaction_type"]),
                     account_name=account_name,
                     account_number=_get_optional(raw, cols["account_number"]),
-                    status=_get_optional(raw, cols["status"]),
                     notes=_get_optional(raw, cols["note"]),
                     tags=_get_optional(raw, cols["tags"]),
                     transaction_id=_get_optional(raw, cols["transaction_id"]),
@@ -306,8 +324,12 @@ def ingest_file(conn, path: Path, category_map: dict, stats: IngestStats) -> Non
                 row.frollo_category, category_map, category_lookup, uncategorised_id, stats
             )
 
-            is_pending = 1 if row.status and row.status.lower() == "pending" else 0
-            posted_date = row.date if not is_pending else None
+            # transaction_type = transfer_incoming / transfer_outgoing overrides category mapping
+            if row.transaction_type in ("transfer_incoming", "transfer_outgoing"):
+                is_transfer = True
+
+            is_pending = 1 if row.posted_date is None else 0
+            posted_date = row.posted_date
 
             conn.execute(
                 """
