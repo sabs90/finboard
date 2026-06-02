@@ -54,6 +54,12 @@ Last updated: 2026-06-03
 - [ ] Dashboard running in Docker on NAS
 - [ ] Accessible via Tailscale at `http://finboard.[tailnet].ts.net:3000`
 
+**Phase 3 in progress** — started Session 2 (2026-06-03):
+- `dashboard/` directory created
+- `dashboard/package.json` written (next 14, better-sqlite3, tailwind)
+- `dashboard/tsconfig.json` written
+- **Interrupted here** — remaining files not yet written (see next session tasks below)
+
 **Phase 3 complete**: [ ]
 
 ---
@@ -127,6 +133,21 @@ Last updated: 2026-06-03
 - Decided amounts stored as integer cents
 - Produced: README.md, CLAUDE.md, PROGRESS.md, SCHEMA.md
 - **Next session**: Phase 1 — schema + db_init.py + ingest_frollo.py
+
+### Session 2 — Phase 3: Dashboard shell (2026-06-03, interrupted)
+- User wants: spending by category, drill-down to transactions, inline category re-assignment, AMP CSV ingest
+- Dashboard directory and package.json/tsconfig.json created
+- **Interrupted before writing any app code**
+- **Pick up next session from the top of Phase 3** — all remaining files still to be written:
+  - `next.config.ts`, `tailwind.config.ts`, `postcss.config.mjs`
+  - `app/globals.css`, `app/layout.tsx`, `app/page.tsx`
+  - `lib/db.ts`, `lib/formatters.ts`, `lib/actions.ts`
+  - `components/layout/Sidebar.tsx`
+  - `components/spending/MonthNav.tsx`, `CategoryTable.tsx`
+  - `components/transactions/TransactionList.tsx`, `CategoryPicker.tsx`
+  - `app/spending/page.tsx`
+  - `scripts/ingest_amp.py`
+- AMP is a bank/super account not supported by Frollo CDR — needs its own ingest script; user to provide a sample CSV so format can be confirmed
 
 ### Session 1 — Phase 1: Data Foundation (2026-06-03)
 - Built `scripts/utils/db.py` — WAL-mode connection, FK enforcement, transaction context manager
