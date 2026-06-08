@@ -35,7 +35,7 @@ export function CategoryPicker({
       value={currentCategoryId ?? ''}
       onChange={handleChange}
       disabled={isPending}
-      className={`text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-700 ${
+      className={`text-xs border border-slate-700 rounded-md px-2 py-1 bg-slate-800 text-slate-200 ${
         isPending ? 'opacity-50' : ''
       }`}
     >

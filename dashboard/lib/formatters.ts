@@ -52,3 +52,31 @@ export function nextMonth(month: string): string {
   if (m === 12) return `${year + 1}-01`;
   return `${year}-${String(m + 1).padStart(2, '0')}`;
 }
+
+/**
+ * Get date range for a period (number of months back from current month).
+ * Returns [startDate, endDate] as YYYY-MM-DD strings.
+ * startDate is first day of the period, endDate is first day of next month.
+ */
+export function getDateRange(periodMonths: number): { startDate: string; endDate: string } {
+  const now = new Date();
+  const endYear = now.getFullYear();
+  const endMonth = now.getMonth() + 1;
+  const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
+
+  // Move endDate to start of next month (exclusive upper bound)
+  const nextM = endMonth === 12 ? 1 : endMonth + 1;
+  const nextY = endMonth === 12 ? endYear + 1 : endYear;
+  const exclusiveEnd = `${nextY}-${String(nextM).padStart(2, '0')}-01`;
+
+  // Start date is periodMonths back
+  let startMonth = endMonth - periodMonths + 1;
+  let startYear = endYear;
+  while (startMonth <= 0) {
+    startMonth += 12;
+    startYear -= 1;
+  }
+  const startDate = `${startYear}-${String(startMonth).padStart(2, '0')}-01`;
+
+  return { startDate, endDate: exclusiveEnd };
+}

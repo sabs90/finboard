@@ -17,7 +17,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${inter.className} bg-gray-50`}>
+      <body className={inter.className}>
         <div className="flex h-screen">
           <Sidebar />
           <main className="flex-1 overflow-y-auto p-8">

@@ -42,6 +42,101 @@ export interface CategoryRow {
   parent_name: string | null;
 }
 
+export interface OverviewKpis {
+  totalSpendCents: number;
+  totalIncomeCents: number;
+  transactionCount: number;
+  topCategory: string;
+  topCategoryCents: number;
+}
+
+export interface CategoryBreakdownRow {
+  parent_category: string;
+  colour: string;
+  total_cents: number;
+}
+
+export interface MonthlyTotalRow {
+  month: string;
+  total_cents: number;
+}
+
+export interface RecentTransactionRow {
+  id: number;
+  transaction_date: string;
+  amount_cents: number;
+  description: string;
+  merchant: string | null;
+  category: string | null;
+  parent_category: string | null;
+  colour: string | null;
+  account_name: string;
+}
+
+export interface AccountRow {
+  id: number;
+  name: string;
+}
+
+export interface CategoryInfo {
+  id: number;
+  name: string;
+  colour: string;
+  parent_id: number | null;
+  parent_name: string | null;
+  parent_colour: string | null;
+}
+
+export interface CategoryTrendRow {
+  month: string;
+  total_cents: number;
+}
+
+export interface StackedTrendRow {
+  month: string;
+  category: string;
+  total_cents: number;
+}
+
+export interface SubcategoryRow {
+  category_id: number;
+  category: string;
+  total_cents: number;
+}
+
+export interface MerchantRow {
+  merchant: string;
+  total_cents: number;
+  transaction_count: number;
+}
+
+export interface ParentCategoryRow {
+  id: number;
+  name: string;
+  colour: string;
+}
+
+export interface ChildCategoryRow {
+  id: number;
+  name: string;
+  parent_id: number;
+  parent_name: string;
+}
+
+export interface TransactionSearchParams {
+  query?: string;
+  accountId?: number;
+  categoryId?: number;
+  month?: string;
+  page: number;
+  pageSize: number;
+}
+
+export interface TransactionSearchResult {
+  transactions: TransactionRow[];
+  total: number;
+}
+
 export function getMonthlySpend(month: string): MonthlySpendRow[] {
   const db = getDb();
   return db.prepare(`
@@ -141,4 +236,410 @@ export function updateTransactionCategory(transactionId: number, categoryId: num
     SET category_id = ?, parent_category_id = ?, updated_at = unixepoch()
     WHERE id = ?
   `).run(categoryId, category.parent_id, transactionId);
+}
+
+export function getOverviewKpis(month: string): OverviewKpis {
+  const db = getDb();
+
+  const spend = db.prepare(`
+    SELECT COALESCE(SUM(amount_cents), 0) AS total
+    FROM transactions
+    WHERE strftime('%Y-%m', transaction_date) = ?
+      AND amount_cents < 0
+      AND is_transfer = 0
+  `).get(month) as { total: number };
+
+  const income = db.prepare(`
+    SELECT COALESCE(SUM(amount_cents), 0) AS total
+    FROM transactions
+    WHERE strftime('%Y-%m', transaction_date) = ?
+      AND amount_cents > 0
+      AND is_transfer = 0
+  `).get(month) as { total: number };
+
+  const count = db.prepare(`
+    SELECT COUNT(*) AS cnt
+    FROM transactions
+    WHERE strftime('%Y-%m', transaction_date) = ?
+      AND is_transfer = 0
+  `).get(month) as { cnt: number };
+
+  const topCat = db.prepare(`
+    SELECT
+      COALESCE(pc.name, c.name, 'Uncategorised') AS category,
+      ABS(SUM(t.amount_cents)) AS total
+    FROM transactions t
+    LEFT JOIN categories c ON t.category_id = c.id
+    LEFT JOIN categories pc ON c.parent_id = pc.id
+    WHERE strftime('%Y-%m', t.transaction_date) = ?
+      AND t.amount_cents < 0
+      AND t.is_transfer = 0
+    GROUP BY COALESCE(pc.name, c.name)
+    ORDER BY ABS(SUM(t.amount_cents)) DESC
+    LIMIT 1
+  `).get(month) as { category: string; total: number } | undefined;
+
+  return {
+    totalSpendCents: spend.total,
+    totalIncomeCents: income.total,
+    transactionCount: count.cnt,
+    topCategory: topCat?.category ?? 'None',
+    topCategoryCents: topCat?.total ?? 0,
+  };
+}
+
+export function getCategoryBreakdown(month: string): CategoryBreakdownRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      COALESCE(pc.name, c.name, 'Uncategorised') AS parent_category,
+      COALESCE(pc.colour, c.colour, '#9CA3AF') AS colour,
+      ABS(SUM(t.amount_cents)) AS total_cents
+    FROM transactions t
+    LEFT JOIN categories c ON t.category_id = c.id
+    LEFT JOIN categories pc ON c.parent_id = pc.id
+    WHERE strftime('%Y-%m', t.transaction_date) = ?
+      AND t.amount_cents < 0
+      AND t.is_transfer = 0
+    GROUP BY COALESCE(pc.name, c.name), COALESCE(pc.colour, c.colour)
+    ORDER BY total_cents DESC
+  `).all(month) as CategoryBreakdownRow[];
+}
+
+export function getMonthlyTotals(months: number): MonthlyTotalRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      strftime('%Y-%m', t.transaction_date) AS month,
+      ABS(SUM(t.amount_cents)) AS total_cents
+    FROM transactions t
+    WHERE t.amount_cents < 0
+      AND t.is_transfer = 0
+      AND t.transaction_date >= date('now', '-' || ? || ' months', 'start of month')
+    GROUP BY strftime('%Y-%m', t.transaction_date)
+    ORDER BY month
+  `).all(months) as MonthlyTotalRow[];
+}
+
+export function getRecentTransactions(limit: number): RecentTransactionRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      t.id,
+      t.transaction_date,
+      t.amount_cents,
+      t.description,
+      t.merchant,
+      c.name AS category,
+      pc.name AS parent_category,
+      COALESCE(pc.colour, c.colour) AS colour,
+      a.name AS account_name
+    FROM transactions t
+    LEFT JOIN categories c ON t.category_id = c.id
+    LEFT JOIN categories pc ON c.parent_id = pc.id
+    JOIN accounts a ON t.account_id = a.id
+    WHERE t.is_transfer = 0
+    ORDER BY t.transaction_date DESC, t.id DESC
+    LIMIT ?
+  `).all(limit) as RecentTransactionRow[];
+}
+
+export function searchTransactions(params: TransactionSearchParams): TransactionSearchResult {
+  const db = getDb();
+  const conditions: string[] = ['t.is_transfer = 0'];
+  const values: (string | number)[] = [];
+
+  if (params.month) {
+    conditions.push("strftime('%Y-%m', t.transaction_date) = ?");
+    values.push(params.month);
+  }
+
+  if (params.accountId) {
+    conditions.push('t.account_id = ?');
+    values.push(params.accountId);
+  }
+
+  if (params.categoryId) {
+    conditions.push('(t.category_id = ? OR c.parent_id = ?)');
+    values.push(params.categoryId, params.categoryId);
+  }
+
+  if (params.query) {
+    conditions.push("(t.description LIKE '%' || ? || '%' OR t.merchant LIKE '%' || ? || '%')");
+    values.push(params.query, params.query);
+  }
+
+  const where = conditions.join(' AND ');
+
+  const countRow = db.prepare(`
+    SELECT COUNT(*) AS cnt
+    FROM transactions t
+    LEFT JOIN categories c ON t.category_id = c.id
+    WHERE ${where}
+  `).get(...values) as { cnt: number };
+
+  const offset = (params.page - 1) * params.pageSize;
+
+  const transactions = db.prepare(`
+    SELECT
+      t.id,
+      t.transaction_date,
+      t.amount_cents,
+      t.description,
+      t.merchant,
+      t.category_id,
+      c.name AS category,
+      pc.name AS parent_category,
+      a.name AS account_name
+    FROM transactions t
+    LEFT JOIN categories c ON t.category_id = c.id
+    LEFT JOIN categories pc ON c.parent_id = pc.id
+    JOIN accounts a ON t.account_id = a.id
+    WHERE ${where}
+    ORDER BY t.transaction_date DESC, t.id DESC
+    LIMIT ? OFFSET ?
+  `).all(...values, params.pageSize, offset) as TransactionRow[];
+
+  return { transactions, total: countRow.cnt };
+}
+
+export function getAccounts(): AccountRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT id, name FROM accounts WHERE is_active = 1 ORDER BY name
+  `).all() as AccountRow[];
+}
+
+export function getCategoryInfo(categoryId: number): CategoryInfo | null {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT
+      c.id,
+      c.name,
+      COALESCE(c.colour, pc.colour, '#9CA3AF') AS colour,
+      c.parent_id,
+      pc.name AS parent_name,
+      pc.colour AS parent_colour
+    FROM categories c
+    LEFT JOIN categories pc ON c.parent_id = pc.id
+    WHERE c.id = ?
+  `).get(categoryId) as CategoryInfo | undefined;
+  return row ?? null;
+}
+
+export function getCategoryMonthlyTrend(parentCategoryId: number, months: number): CategoryTrendRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      strftime('%Y-%m', t.transaction_date) AS month,
+      ABS(SUM(t.amount_cents)) AS total_cents
+    FROM transactions t
+    LEFT JOIN categories c ON t.category_id = c.id
+    WHERE (t.category_id = ? OR c.parent_id = ?)
+      AND t.amount_cents < 0
+      AND t.is_transfer = 0
+      AND t.transaction_date >= date('now', '-' || ? || ' months', 'start of month')
+    GROUP BY strftime('%Y-%m', t.transaction_date)
+    ORDER BY month
+  `).all(parentCategoryId, parentCategoryId, months) as CategoryTrendRow[];
+}
+
+export function getSubcategoryBreakdown(parentCategoryId: number, startDate: string, endDate: string): SubcategoryRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      t.category_id,
+      COALESCE(c.name, 'Uncategorised') AS category,
+      ABS(SUM(t.amount_cents)) AS total_cents
+    FROM transactions t
+    LEFT JOIN categories c ON t.category_id = c.id
+    WHERE (t.category_id = ? OR c.parent_id = ?)
+      AND t.amount_cents < 0
+      AND t.is_transfer = 0
+      AND t.transaction_date >= ?
+      AND t.transaction_date < ?
+    GROUP BY t.category_id, c.name
+    ORDER BY total_cents DESC
+  `).all(parentCategoryId, parentCategoryId, startDate, endDate) as SubcategoryRow[];
+}
+
+export function getTopMerchants(parentCategoryId: number, startDate: string, endDate: string): MerchantRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      COALESCE(t.merchant, t.description) AS merchant,
+      ABS(SUM(t.amount_cents)) AS total_cents,
+      COUNT(*) AS transaction_count
+    FROM transactions t
+    LEFT JOIN categories c ON t.category_id = c.id
+    WHERE (t.category_id = ? OR c.parent_id = ?)
+      AND t.amount_cents < 0
+      AND t.is_transfer = 0
+      AND t.transaction_date >= ?
+      AND t.transaction_date < ?
+    GROUP BY COALESCE(t.merchant, t.description)
+    ORDER BY total_cents DESC
+    LIMIT 10
+  `).all(parentCategoryId, parentCategoryId, startDate, endDate) as MerchantRow[];
+}
+
+export function getCategoryDetailTransactions(
+  parentCategoryId: number,
+  startDate: string,
+  endDate: string,
+): TransactionRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      t.id,
+      t.transaction_date,
+      t.amount_cents,
+      t.description,
+      t.merchant,
+      t.category_id,
+      c.name AS category,
+      pc.name AS parent_category,
+      a.name AS account_name
+    FROM transactions t
+    LEFT JOIN categories c ON t.category_id = c.id
+    LEFT JOIN categories pc ON c.parent_id = pc.id
+    JOIN accounts a ON t.account_id = a.id
+    WHERE (t.category_id = ? OR c.parent_id = ?)
+      AND t.amount_cents < 0
+      AND t.is_transfer = 0
+      AND t.transaction_date >= ?
+      AND t.transaction_date < ?
+    ORDER BY t.transaction_date DESC, t.id DESC
+  `).all(parentCategoryId, parentCategoryId, startDate, endDate) as TransactionRow[];
+}
+
+export function getCategorySpendForMonth(categoryId: number, month: string): number {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT COALESCE(ABS(SUM(t.amount_cents)), 0) AS total
+    FROM transactions t
+    LEFT JOIN categories c ON t.category_id = c.id
+    WHERE (t.category_id = ? OR c.parent_id = ?)
+      AND t.amount_cents < 0
+      AND t.is_transfer = 0
+      AND strftime('%Y-%m', t.transaction_date) = ?
+  `).get(categoryId, categoryId, month) as { total: number };
+  return row.total;
+}
+
+export function getStackedMonthlyTrend(parentCategoryId: number, months: number): StackedTrendRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      strftime('%Y-%m', t.transaction_date) AS month,
+      COALESCE(c.name, 'Uncategorised') AS category,
+      ABS(SUM(t.amount_cents)) AS total_cents
+    FROM transactions t
+    LEFT JOIN categories c ON t.category_id = c.id
+    WHERE (t.category_id = ? OR c.parent_id = ?)
+      AND t.amount_cents < 0
+      AND t.is_transfer = 0
+      AND t.transaction_date >= date('now', '-' || ? || ' months', 'start of month')
+    GROUP BY strftime('%Y-%m', t.transaction_date), c.name
+    ORDER BY month, total_cents DESC
+  `).all(parentCategoryId, parentCategoryId, months) as StackedTrendRow[];
+}
+
+export function getParentCategories(): ParentCategoryRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT id, name, COALESCE(colour, '#9CA3AF') AS colour
+    FROM categories
+    WHERE parent_id IS NULL
+    ORDER BY sort_order, name
+  `).all() as ParentCategoryRow[];
+}
+
+export function getChildCategories(parentId: number): ChildCategoryRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT c.id, c.name, c.parent_id, pc.name AS parent_name
+    FROM categories c
+    JOIN categories pc ON c.parent_id = pc.id
+    WHERE c.parent_id = ?
+    ORDER BY c.sort_order, c.name
+  `).all(parentId) as ChildCategoryRow[];
+}
+
+export function getSubcategorySpendForMonth(categoryId: number, month: string): number {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT COALESCE(ABS(SUM(t.amount_cents)), 0) AS total
+    FROM transactions t
+    WHERE t.category_id = ?
+      AND t.amount_cents < 0
+      AND t.is_transfer = 0
+      AND strftime('%Y-%m', t.transaction_date) = ?
+  `).get(categoryId, month) as { total: number };
+  return row.total;
+}
+
+export function getSubcategoryMonthlyTrend(categoryId: number, months: number): CategoryTrendRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      strftime('%Y-%m', t.transaction_date) AS month,
+      ABS(SUM(t.amount_cents)) AS total_cents
+    FROM transactions t
+    WHERE t.category_id = ?
+      AND t.amount_cents < 0
+      AND t.is_transfer = 0
+      AND t.transaction_date >= date('now', '-' || ? || ' months', 'start of month')
+    GROUP BY strftime('%Y-%m', t.transaction_date)
+    ORDER BY month
+  `).all(categoryId, months) as CategoryTrendRow[];
+}
+
+export function getSubcategoryMerchants(categoryId: number, startDate: string, endDate: string): MerchantRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      COALESCE(t.merchant, t.description) AS merchant,
+      ABS(SUM(t.amount_cents)) AS total_cents,
+      COUNT(*) AS transaction_count
+    FROM transactions t
+    WHERE t.category_id = ?
+      AND t.amount_cents < 0
+      AND t.is_transfer = 0
+      AND t.transaction_date >= ?
+      AND t.transaction_date < ?
+    GROUP BY COALESCE(t.merchant, t.description)
+    ORDER BY total_cents DESC
+    LIMIT 10
+  `).all(categoryId, startDate, endDate) as MerchantRow[];
+}
+
+export function getSubcategoryTransactions(
+  categoryId: number,
+  startDate: string,
+  endDate: string,
+): TransactionRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      t.id,
+      t.transaction_date,
+      t.amount_cents,
+      t.description,
+      t.merchant,
+      t.category_id,
+      c.name AS category,
+      pc.name AS parent_category,
+      a.name AS account_name
+    FROM transactions t
+    LEFT JOIN categories c ON t.category_id = c.id
+    LEFT JOIN categories pc ON c.parent_id = pc.id
+    JOIN accounts a ON t.account_id = a.id
+    WHERE t.category_id = ?
+      AND t.amount_cents < 0
+      AND t.is_transfer = 0
+      AND t.transaction_date >= ?
+      AND t.transaction_date < ?
+    ORDER BY t.transaction_date DESC, t.id DESC
+  `).all(categoryId, startDate, endDate) as TransactionRow[];
 }

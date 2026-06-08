@@ -45,78 +45,53 @@ export function CategoryTable({
   const maxCents = Math.min(...groups.map((g) => g.totalCents));
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-100">
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+    <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+      <div className="px-6 py-4 border-b border-slate-800">
+        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide">
           Spending by Category
         </h2>
       </div>
-      <div className="divide-y divide-gray-50">
-        {groups.map((group) => {
-          const isParentSelected = selectedCategoryId === group.parentId;
-          return (
-            <div key={group.parentName}>
-              <Link
-                href={
-                  isParentSelected
-                    ? `/spending?month=${month}`
-                    : `/spending?month=${month}&cat=${group.parentId}`
-                }
-                className="flex items-center px-6 py-3 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: group.colour || '#9CA3AF' }}
-                    />
-                    <span className="text-sm font-medium text-gray-900">
-                      {group.parentName}
-                    </span>
-                  </div>
-                  <div className="mt-1.5 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${(group.totalCents / maxCents) * 100}%`,
-                        backgroundColor: group.colour || '#9CA3AF',
-                      }}
-                    />
-                  </div>
-                </div>
-                <span className="text-sm font-semibold text-gray-900 ml-4">
-                  {formatCurrency(group.totalCents)}
+      <div className="divide-y divide-slate-800">
+        {groups.map((group) => (
+          <Link
+            key={group.parentName}
+            href={group.parentId ? `/spending/category/${group.parentId}` : `/spending?month=${month}`}
+            className="flex items-center px-6 py-3 hover:bg-slate-800/50 transition-colors group"
+          >
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: group.colour || '#9CA3AF' }}
+                />
+                <span className="text-sm font-medium text-slate-100">
+                  {group.parentName}
                 </span>
-              </Link>
-              {isParentSelected && (
-                <div className="bg-gray-50 px-6 py-1">
-                  {group.children.map((child) => (
-                    <Link
-                      key={child.category_id}
-                      href={
-                        selectedCategoryId === child.category_id
-                          ? `/spending?month=${month}`
-                          : `/spending?month=${month}&cat=${child.category_id}`
-                      }
-                      className={`flex items-center justify-between py-2 pl-5 text-sm ${
-                        selectedCategoryId === child.category_id
-                          ? 'text-gray-900 font-medium'
-                          : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      <span>{child.category}</span>
-                      <span>{formatCurrency(child.total_cents)}</span>
-                    </Link>
-                  ))}
-                </div>
-              )}
+                {group.parentId && (
+                  <span className="text-slate-600 group-hover:text-slate-400 transition-colors text-xs">
+                    &rarr;
+                  </span>
+                )}
+              </div>
+              <div className="mt-1.5 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${(group.totalCents / maxCents) * 100}%`,
+                    backgroundColor: group.colour || '#9CA3AF',
+                  }}
+                />
+              </div>
             </div>
-          );
-        })}
+            <span className="text-sm font-semibold text-slate-100 ml-4">
+              {formatCurrency(group.totalCents)}
+            </span>
+          </Link>
+        ))}
       </div>
-      <div className="px-6 py-3 border-t border-gray-100 flex justify-between">
-        <span className="text-sm font-semibold text-gray-900">Total</span>
-        <span className="text-sm font-semibold text-gray-900">
+      <div className="px-6 py-3 border-t border-slate-800 flex justify-between">
+        <span className="text-sm font-semibold text-slate-100">Total</span>
+        <span className="text-sm font-semibold text-slate-100">
           {formatCurrency(rows.reduce((sum, r) => sum + r.total_cents, 0))}
         </span>
       </div>
