@@ -1,6 +1,6 @@
 # PROGRESS.md — Finboard Build Tracker
 
-Last updated: 2026-06-03
+Last updated: 2026-06-09
 
 ---
 
@@ -43,10 +43,15 @@ Last updated: 2026-06-03
 ### Phase 3 — Dashboard Shell
 **Goal**: Next.js app running in Docker, accessible over Tailscale, with navigation and design system.
 
-- [ ] `dashboard/` Next.js project initialised (App Router, TypeScript, Tailwind)
-- [ ] `lib/db.ts` — better-sqlite3 query helpers
-- [ ] `lib/formatters.ts` — AUD currency formatter, AU date formatter
-- [ ] Navigation / sidebar layout component
+- [x] `dashboard/` Next.js project initialised (App Router, TypeScript, Tailwind)
+- [x] `lib/db.ts` — better-sqlite3 query helpers (singleton, getMonthlySpend, getCategoryTransactions, getAllCategories)
+- [x] `lib/formatters.ts` — AUD currency formatter, AU date formatter, month navigation
+- [x] `lib/actions.ts` — server action for inline category reassignment
+- [x] Navigation / sidebar layout component (dark slate sidebar, 5 nav items)
+- [x] Spending by category page with drill-down to transactions
+- [x] Inline category reassignment via `<select>` with optgroups
+- [x] Month navigation (prev/next)
+- [x] Dev server verified working with real data (200 on /spending)
 - [ ] Design tokens / colour palette decided and documented
 - [ ] Empty state screens for all 6 views
 - [ ] `docker/Dockerfile.dashboard` written
@@ -54,11 +59,7 @@ Last updated: 2026-06-03
 - [ ] Dashboard running in Docker on NAS
 - [ ] Accessible via Tailscale at `http://finboard.[tailnet].ts.net:3000`
 
-**Phase 3 in progress** — started Session 2 (2026-06-03):
-- `dashboard/` directory created
-- `dashboard/package.json` written (next 14, better-sqlite3, tailwind)
-- `dashboard/tsconfig.json` written
-- **Interrupted here** — remaining files not yet written (see next session tasks below)
+**Phase 3 partially complete** — dashboard shell running, spending view functional, Docker not yet done.
 
 **Phase 3 complete**: [ ]
 
@@ -135,19 +136,31 @@ Last updated: 2026-06-03
 - **Next session**: Phase 1 — schema + db_init.py + ingest_frollo.py
 
 ### Session 2 — Phase 3: Dashboard shell (2026-06-03, interrupted)
-- User wants: spending by category, drill-down to transactions, inline category re-assignment, AMP CSV ingest
 - Dashboard directory and package.json/tsconfig.json created
 - **Interrupted before writing any app code**
-- **Pick up next session from the top of Phase 3** — all remaining files still to be written:
-  - `next.config.ts`, `tailwind.config.ts`, `postcss.config.mjs`
-  - `app/globals.css`, `app/layout.tsx`, `app/page.tsx`
+
+### Session 3 — Phase 3 + Category cleanup (2026-06-03 to 2026-06-09)
+- **Dashboard shell completed**: all 15 app files written and verified
+  - `next.config.mjs`, `tailwind.config.ts`, `postcss.config.mjs`
+  - `app/globals.css`, `app/layout.tsx`, `app/page.tsx`, `app/spending/page.tsx`
   - `lib/db.ts`, `lib/formatters.ts`, `lib/actions.ts`
-  - `components/layout/Sidebar.tsx`
-  - `components/spending/MonthNav.tsx`, `CategoryTable.tsx`
-  - `components/transactions/TransactionList.tsx`, `CategoryPicker.tsx`
-  - `app/spending/page.tsx`
-  - `scripts/ingest_amp.py`
-- AMP is a bank/super account not supported by Frollo CDR — needs its own ingest script; user to provide a sample CSV so format can be confirmed
+  - `components/layout/Sidebar.tsx`, `components/spending/MonthNav.tsx`, `components/spending/CategoryTable.tsx`
+  - `components/transactions/TransactionList.tsx`, `components/transactions/CategoryPicker.tsx`
+- Fixed: `better-sqlite3` bumped to v12 for Node 25 compatibility
+- Fixed: `next.config.ts` → `next.config.mjs` (Next 14 doesn't support .ts config)
+- **Category review workflow established** (CSV export → user edit → apply):
+  - Workflow A: merchant-level (`scripts/apply_categories.py` → `config/merchant_rules.json`)
+  - Workflow B: description keyword-level (`scripts/apply_description_categories.py` → `config/description_rules.json`)
+- 3 rounds of category cleanup performed:
+  - Round 1 (merchant): 1,397 txns updated, 105 merchant rules saved
+  - Round 2 (description keywords): 1,376 txns updated, 119 keyword rules
+  - Round 3+4 (further cleanup): 648 more txns updated, 144 total keyword rules
+- New parent categories added: Tech, Property, Family, Islam
+- New child categories: Books, Kids, Arts/Crafts/Projects, House, Fines, Maintenance (Transport), Car, Council & Water, Daycare, Zakat/Sadaqa, Mortgage, Sport, Pool, Rent, Salary, Cashback, Investments
+- "Money Transfers" category added under Transfers — sets is_transfer=1, excluded from expense tracking
+- Ingest pipeline now has 3-tier priority: merchant rules > description keyword rules > Frollo category mapping
+- Final state: 1,911 categorised expenses, 90 money transfers, 157 uncategorised
+- AMP CSV ingest still pending — user to provide sample CSV
 
 ### Session 1 — Phase 1: Data Foundation (2026-06-03)
 - Built `scripts/utils/db.py` — WAL-mode connection, FK enforcement, transaction context manager
@@ -181,6 +194,8 @@ _None yet — update this section as issues arise._
 | 4 | No ORM | 0 | Adds complexity without benefit for a small, stable schema |
 | 5 | Server components for DB access | 0 | No API layer needed; simpler stack for local-only app |
 | 6 | Frollo CSV export (not API) | 0 | Frollo has no consumer API; CSV is the only personal-use egress path |
+| 7 | 3-tier category resolution | 3 | Merchant rules > description keywords > Frollo category. Handles HSBC raw descriptions where Frollo can't identify merchant |
+| 8 | CSV-based category review workflow | 3 | Export → user edits in Numbers/Excel → re-import. Repeatable for ongoing cleanup |
 
 ---
 

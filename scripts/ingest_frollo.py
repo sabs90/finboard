@@ -72,27 +72,30 @@ def load_category_map() -> dict:
         return json.load(f)
 
 
-def resolve_category(
-    frollo_category: Optional[str],
-    category_map: dict,
+def load_merchant_rules() -> dict:
+    """Load merchant → category rules from config/merchant_rules.json (if it exists)."""
+    rules_path = Path(__file__).parent.parent / "config" / "merchant_rules.json"
+    if rules_path.exists():
+        with open(rules_path, encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def load_description_rules() -> dict:
+    """Load description keyword → category rules from config/description_rules.json (if it exists)."""
+    rules_path = Path(__file__).parent.parent / "config" / "description_rules.json"
+    if rules_path.exists():
+        with open(rules_path, encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def _resolve_mapping(
+    mapping: dict,
     category_lookup: dict[str, int],
     uncategorised_id: int,
-    stats: IngestStats,
 ) -> tuple[Optional[int], Optional[int], bool]:
-    """
-    Map a Frollo category name to (category_id, parent_category_id, is_transfer).
-    Returns (uncategorised_id, None, False) for unmapped categories.
-    """
-    if not frollo_category:
-        return uncategorised_id, None, False
-
-    mapping = category_map.get(frollo_category)
-    if mapping is None:
-        if frollo_category not in stats.unmapped_categories:
-            logger.warning("Unmapped Frollo category: '%s' → Uncategorised", frollo_category)
-        stats.unmapped_categories.add(frollo_category)
-        return uncategorised_id, None, False
-
+    """Resolve a category mapping dict to (category_id, parent_category_id, is_transfer)."""
     is_transfer = mapping.get("is_transfer", False)
     parent_name = mapping.get("parent")
     child_name = mapping.get("child")
@@ -103,8 +106,57 @@ def resolve_category(
         child_id = category_lookup.get(f"{parent_name}|{child_name}")
         return child_id or parent_id or uncategorised_id, parent_id, is_transfer
     else:
-        # No child → store at parent level; parent_category_id is null
         return parent_id or uncategorised_id, None, is_transfer
+
+
+def _match_description_rule(
+    description: str,
+    description_rules: dict,
+) -> Optional[dict]:
+    """Check if any keyword rule matches the description (case-insensitive). Returns the rule or None."""
+    desc_lower = description.lower()
+    for keyword, rule in description_rules.items():
+        if keyword in desc_lower:
+            return rule
+    return None
+
+
+def resolve_category(
+    frollo_category: Optional[str],
+    merchant: Optional[str],
+    description: str,
+    category_map: dict,
+    merchant_rules: dict,
+    description_rules: dict,
+    category_lookup: dict[str, int],
+    uncategorised_id: int,
+    stats: IngestStats,
+) -> tuple[Optional[int], Optional[int], bool]:
+    """
+    Map a transaction to (category_id, parent_category_id, is_transfer).
+    Priority: merchant rules > description keyword rules > Frollo category mapping.
+    """
+    # 1. Merchant rules override everything
+    if merchant and merchant in merchant_rules:
+        return _resolve_mapping(merchant_rules[merchant], category_lookup, uncategorised_id)
+
+    # 2. Description keyword rules (for raw card descriptions where merchant is Unknown)
+    desc_rule = _match_description_rule(description, description_rules)
+    if desc_rule:
+        return _resolve_mapping(desc_rule, category_lookup, uncategorised_id)
+
+    # 3. Frollo category mapping
+    if not frollo_category:
+        return uncategorised_id, None, False
+
+    mapping = category_map.get(frollo_category)
+    if mapping is None:
+        if frollo_category not in stats.unmapped_categories:
+            logger.warning("Unmapped Frollo category: '%s' → Uncategorised", frollo_category)
+        stats.unmapped_categories.add(frollo_category)
+        return uncategorised_id, None, False
+
+    return _resolve_mapping(mapping, category_lookup, uncategorised_id)
 
 
 # ── Account helpers ───────────────────────────────────────────────────────────
@@ -299,7 +351,7 @@ def build_category_lookup(conn) -> dict[str, int]:
     return lookup
 
 
-def ingest_file(conn, path: Path, category_map: dict, stats: IngestStats) -> None:
+def ingest_file(conn, path: Path, category_map: dict, merchant_rules: dict, description_rules: dict, stats: IngestStats) -> None:
     """Ingest a single Frollo CSV file into the database."""
     logger.info("Processing: %s", path.name)
     rows = parse_csv(path)
@@ -321,7 +373,9 @@ def ingest_file(conn, path: Path, category_map: dict, stats: IngestStats) -> Non
         try:
             account_id = get_or_create_account(conn, row.account_name, row.account_number, stats)
             category_id, parent_category_id, is_transfer = resolve_category(
-                row.frollo_category, category_map, category_lookup, uncategorised_id, stats
+                row.frollo_category, row.merchant, row.description,
+                category_map, merchant_rules, description_rules,
+                category_lookup, uncategorised_id, stats,
             )
 
             # transaction_type = transfer_incoming / transfer_outgoing overrides category mapping
@@ -371,8 +425,15 @@ def main() -> None:
     args = parser.parse_args()
 
     category_map = load_category_map()
+    merchant_rules = load_merchant_rules()
+    description_rules = load_description_rules()
     conn = get_connection()
     stats = IngestStats()
+
+    if merchant_rules:
+        logger.info("Loaded %d merchant rules", len(merchant_rules))
+    if description_rules:
+        logger.info("Loaded %d description keyword rules", len(description_rules))
 
     try:
         if args.file:
@@ -391,7 +452,7 @@ def main() -> None:
 
         with transaction(conn):
             for csv_path in files:
-                ingest_file(conn, csv_path, category_map, stats)
+                ingest_file(conn, csv_path, category_map, merchant_rules, description_rules, stats)
 
     finally:
         conn.close()

@@ -1,0 +1,580 @@
+{
+  "solar": {
+    "parent": "Housing",
+    "child": "Maintenance"
+  },
+  "butcher": {
+    "parent": "Food & Drink",
+    "child": "Groceries"
+  },
+  "metro": {
+    "parent": "Transport",
+    "child": "Fuel"
+  },
+  "superloop": {
+    "parent": "Utilities",
+    "child": "Internet"
+  },
+  "chemist": {
+    "parent": "Health",
+    "child": "GP / Medical"
+  },
+  "jannah": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "branch": {
+    "parent": "Transfers",
+    "child": "Money Transfers",
+    "is_transfer": true
+  },
+  "ampol": {
+    "parent": "Transport",
+    "child": "Fuel"
+  },
+  "teknikool": {
+    "parent": "Housing",
+    "child": "Maintenance"
+  },
+  "woolworths": {
+    "parent": "Food & Drink",
+    "child": "Groceries"
+  },
+  "nzf": {
+    "parent": "Islam",
+    "child": "Zakat/Sadaqa"
+  },
+  "atm": {
+    "parent": "Transfers",
+    "child": "Money Transfers",
+    "is_transfer": true
+  },
+  "ej": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "noodles": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "energy": {
+    "parent": "Utilities",
+    "child": "Electricity"
+  },
+  "cafe": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "islam": {
+    "parent": "Islam",
+    "child": "Zakat/Sadaqa"
+  },
+  "payment                                 to hussain sabeeh": {
+    "parent": "Property",
+    "child": "Mortgage"
+  },
+  "guzman": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "interest": {
+    "parent": "Property",
+    "child": "Mortgage"
+  },
+  "account servicing fee": {
+    "parent": "Financial",
+    "child": "Bank Fees"
+  },
+  "dishonour fee": {
+    "parent": "Financial",
+    "child": "Bank Fees"
+  },
+  "charity": {
+    "parent": "Islam",
+    "child": "Zakat/Sadaqa"
+  },
+  "beverly hills 888": {
+    "parent": "Food & Drink",
+    "child": "Restaurants"
+  },
+  "service nsw": {
+    "parent": "Transport",
+    "child": "Rego & Insurance"
+  },
+  "kiwico": {
+    "parent": "Shopping",
+    "child": "Kids"
+  },
+  "bing lee": {
+    "parent": "Shopping",
+    "child": "House"
+  },
+  "wotif": {
+    "parent": "Travel",
+    "child": "General Travel"
+  },
+  "bunnings": {
+    "parent": "Housing",
+    "child": "Maintenance"
+  },
+  "amazon": {
+    "parent": "Shopping",
+    "child": "General"
+  },
+  "amino": {
+    "parent": "Shopping",
+    "child": "General"
+  },
+  "officeworks": {
+    "parent": "Shopping",
+    "child": "General"
+  },
+  "webster": {
+    "parent": "Shopping",
+    "child": "House"
+  },
+  "aldi": {
+    "parent": "Food & Drink",
+    "child": "Groceries"
+  },
+  "ikea": {
+    "parent": "Shopping",
+    "child": "House"
+  },
+  "soccajoeys": {
+    "parent": "Entertainment",
+    "child": "Kids"
+  },
+  "zambounis": {
+    "parent": "Housing",
+    "child": "Maintenance"
+  },
+  "kiss active": {
+    "parent": "Shopping",
+    "child": "Clothing"
+  },
+  "neptune": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "tyrwhitt": {
+    "parent": "Shopping",
+    "child": "Clothing"
+  },
+  "big w": {
+    "parent": "Shopping",
+    "child": "Clothing"
+  },
+  "tumbleweed": {
+    "parent": "Housing",
+    "child": "Maintenance"
+  },
+  "medical": {
+    "parent": "Health",
+    "child": "GP / Medical"
+  },
+  "kebab": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "muji": {
+    "parent": "Shopping",
+    "child": "Clothing"
+  },
+  "graind": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "doctor": {
+    "parent": "Health",
+    "child": "GP / Medical"
+  },
+  "aia": {
+    "parent": "Financial",
+    "child": "Insurance"
+  },
+  "baked": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "1919": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "hifi": {
+    "parent": "Shopping",
+    "child": "Electronics"
+  },
+  "airlines": {
+    "parent": "Travel",
+    "child": "General Travel"
+  },
+  "caffeine": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "modiv": {
+    "parent": "Shopping",
+    "child": "Clothing"
+  },
+  "bakery": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "pasta": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "exetel": {
+    "parent": "Utilities",
+    "child": "Internet"
+  },
+  "amzn": {
+    "parent": "Tech",
+    "child": "Subscriptions"
+  },
+  "morning hit": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "maa": {
+    "parent": "Islam",
+    "child": "Zakat/Sadaqa"
+  },
+  "meats": {
+    "parent": "Food & Drink",
+    "child": "Groceries"
+  },
+  "coffee": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "deli": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "lune": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "sushi": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "langkawi": {
+    "parent": "Travel",
+    "child": "General Travel"
+  },
+  "coles": {
+    "parent": "Food & Drink",
+    "child": "Groceries"
+  },
+  "baby": {
+    "parent": "Shopping",
+    "child": "Kids"
+  },
+  "car": {
+    "parent": "Transport",
+    "child": "Maintenance"
+  },
+  "dera": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "phillip": {
+    "parent": "Health",
+    "child": "Sport"
+  },
+  "getfried": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "vegetables": {
+    "parent": "Food & Drink",
+    "child": "Groceries"
+  },
+  "dhaba": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "ogalo": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "burger": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "yum yum": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "etoll": {
+    "parent": "Transport",
+    "child": "Tolls"
+  },
+  "malay chinese": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "cursor": {
+    "parent": "Tech",
+    "child": "Subscriptions"
+  },
+  "hyderabad": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "pharmacy": {
+    "parent": "Health",
+    "child": "GP / Medical"
+  },
+  "molly": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "krazy": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "afrah": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "kitchen": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "bunsik": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "istanbul": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "pline": {
+    "parent": "Health",
+    "child": "GP / Medical"
+  },
+  "tang": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "readwise": {
+    "parent": "Tech",
+    "child": "Subscriptions"
+  },
+  "kuertosh": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "waffle": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "1915": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "fishbowl": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "gardens": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "pizza": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "3d memberships": {
+    "parent": "Tech",
+    "child": "Subscriptions"
+  },
+  "parking": {
+    "parent": "Transport",
+    "child": "Parking"
+  },
+  "debrid": {
+    "parent": "Tech",
+    "child": "Subscriptions"
+  },
+  "tiffin": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "black-rabbit": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "pancake": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "khushboo": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "papprich": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "lanzhou": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "donuts": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "lewrap": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "pho": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "poultry": {
+    "parent": "Food & Drink",
+    "child": "Groceries"
+  },
+  "mcdonald": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "soccerbee": {
+    "parent": "Health",
+    "child": "Sport"
+  },
+  "home assistant": {
+    "parent": "Tech",
+    "child": "Subscriptions"
+  },
+  "grillz": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "beem": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "substack": {
+    "parent": "Entertainment",
+    "child": "Subscriptions"
+  },
+  "aquatic": {
+    "parent": "Health",
+    "child": "Pool"
+  },
+  "senza": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "transportfornsw": {
+    "parent": "Transport",
+    "child": "Public Transport"
+  },
+  "errichiello": {
+    "parent": "Property",
+    "child": "Rent"
+  },
+  "elanor": {
+    "parent": "Financial",
+    "child": "Salary"
+  },
+  "shopback": {
+    "parent": "Financial",
+    "child": "Cashback"
+  },
+  "gmhba": {
+    "parent": "Financial",
+    "child": "Insurance"
+  },
+  "myer": {
+    "parent": "Shopping",
+    "child": "Clothing"
+  },
+  "marina": {
+    "parent": "Financial",
+    "child": "Investments"
+  },
+  "tailoring": {
+    "parent": "Shopping",
+    "child": "Clothing"
+  },
+  "ahm": {
+    "parent": "Financial",
+    "child": "Insurance"
+  },
+  "paypal": {
+    "parent": "Shopping",
+    "child": "General"
+  },
+  "dominos": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "amber": {
+    "parent": "Utilities",
+    "child": "Electricity"
+  },
+  "pandora": {
+    "parent": "Shopping",
+    "child": "General"
+  },
+  "modesty": {
+    "parent": "Shopping",
+    "child": "General"
+  },
+  "supermarket": {
+    "parent": "Food & Drink",
+    "child": "Groceries"
+  },
+  "grocer": {
+    "parent": "Food & Drink",
+    "child": "Groceries"
+  },
+  "malaysia": {
+    "parent": "Travel",
+    "child": "General Travel"
+  },
+  "fruit": {
+    "parent": "Food & Drink",
+    "child": "Groceries"
+  },
+  "cashback": {
+    "parent": "Financial",
+    "child": "Cashback"
+  },
+  "panahi": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "rempah": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "reddy": {
+    "parent": "Transport",
+    "child": "Fuel"
+  },
+  "craft": {
+    "parent": "Shopping",
+    "child": "Arts/Crafts/Projects"
+  },
+  "boosty": {
+    "parent": "Shopping",
+    "child": "Arts/Crafts/Projects"
+  },
+  "transport nsw": {
+    "parent": "Transport",
+    "child": "Tolls"
+  },
+  "bluefit": {
+    "parent": "Health",
+    "child": "Kids"
+  }
+}

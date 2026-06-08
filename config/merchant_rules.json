@@ -1,0 +1,424 @@
+{
+  "Youtube": {
+    "parent": "Entertainment",
+    "child": "Subscriptions"
+  },
+  "Audible, Inc.": {
+    "parent": "Entertainment",
+    "child": "Subscriptions"
+  },
+  "Dymocks": {
+    "parent": "Entertainment",
+    "child": "Books"
+  },
+  "Gunyama Park Aquatic And Recreation Centre": {
+    "parent": "Entertainment",
+    "child": "Kids"
+  },
+  "Better Read Than Dead": {
+    "parent": "Shopping",
+    "child": "Gifts"
+  },
+  "Seymour Theatre Centre": {
+    "parent": "Entertainment",
+    "child": "Kids"
+  },
+  "Kaisercraft": {
+    "parent": "Shopping",
+    "child": "Arts/Crafts/Projects"
+  },
+  "Stan": {
+    "parent": "Entertainment",
+    "child": "Subscriptions"
+  },
+  "Kinokuniya": {
+    "parent": "Entertainment",
+    "child": "Books"
+  },
+  "Everest Books": {
+    "parent": "Entertainment",
+    "child": "Books"
+  },
+  "Joyland Amusements": {
+    "parent": "Entertainment",
+    "child": "Kids"
+  },
+  "Google": {
+    "parent": "Tech",
+    "child": "Subscriptions"
+  },
+  "Claude.Ai": {
+    "parent": "Tech",
+    "child": "Subscriptions"
+  },
+  "Cursor": {
+    "parent": "Tech",
+    "child": "Subscriptions"
+  },
+  "Onepass": {
+    "parent": "Tech",
+    "child": "Subscriptions"
+  },
+  "Uber One": {
+    "parent": "Tech",
+    "child": "Subscriptions"
+  },
+  "Unknown": {
+    "parent": "Uncategorised",
+    "child": "Uncategorised"
+  },
+  "Budget Direct": {
+    "parent": "Transport",
+    "child": "Rego & Insurance"
+  },
+  "Gio": {
+    "parent": "Transport",
+    "child": "Rego & Insurance"
+  },
+  "Revenue NSW": {
+    "parent": "Financial",
+    "child": "Fines"
+  },
+  "Oliver Brown": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Senza Espresso Bar": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "The Naked Duck": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "The Ritz Cafe": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Youies": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Kosta's Takeaway": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Xs Espresso": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Bourke Street Bakery": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Amanti Di Caffe": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Edition Roasters": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Soul Origin": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Bar Bellaccino": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Blip Cafe": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Defrance": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Bowery Lane": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Breadtop": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Brooklyn Bridge Deli": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Bakers Delight": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Specialty Donuts": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Sushi Hub": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Cali Press": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Ogalo": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Naji's Gourmet Foods": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "El Jannah": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Shawerma Aldaya'a": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Frango": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Sushi And Wasabi": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Get Fried": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Al Afrah Pastry Shop": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Costi Bros Seafood": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Mad Mex": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Gozleme King": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Winter Garden Deli": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Nene Chicken": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "Bluefit": {
+    "parent": "Health",
+    "child": "Kids"
+  },
+  "IKEA": {
+    "parent": "Shopping",
+    "child": "House"
+  },
+  "Baby Bunting": {
+    "parent": "Shopping",
+    "child": "Kids"
+  },
+  "Ecosa": {
+    "parent": "Shopping",
+    "child": "House"
+  },
+  "Jaycar": {
+    "parent": "Shopping",
+    "child": "Arts/Crafts/Projects"
+  },
+  "Big W": {
+    "parent": "Shopping",
+    "child": "Clothing"
+  },
+  "Kmart": {
+    "parent": "Shopping",
+    "child": "Clothing"
+  },
+  "Chatgpt": {
+    "parent": "Tech",
+    "child": "Subscriptions"
+  },
+  "Myer": {
+    "parent": "Shopping",
+    "child": "Clothing"
+  },
+  "Cloudflare": {
+    "parent": "Tech",
+    "child": "Subscriptions"
+  },
+  "Tk Maxx": {
+    "parent": "Shopping",
+    "child": "Clothing"
+  },
+  "Ventraip Australia": {
+    "parent": "Tech",
+    "child": "Subscriptions"
+  },
+  "Zoho": {
+    "parent": "Tech",
+    "child": "Subscriptions"
+  },
+  "Cricut": {
+    "parent": "Shopping",
+    "child": "Arts/Crafts/Projects"
+  },
+  "Winyard Tri Pl Sydn": {
+    "parent": "Uncategorised",
+    "child": "Uncategorised"
+  },
+  "Linkt": {
+    "parent": "Transport",
+    "child": "Tolls"
+  },
+  "City Of Parramatta Council": {
+    "parent": "Transport",
+    "child": "Parking"
+  },
+  "Automotive Superstore": {
+    "parent": "Transport",
+    "child": "Maintenance"
+  },
+  "Wilson Parking": {
+    "parent": "Transport",
+    "child": "Parking"
+  },
+  "Parknpay": {
+    "parent": "Transport",
+    "child": "Parking"
+  },
+  "Inner West Council": {
+    "parent": "Transport",
+    "child": "Parking"
+  },
+  "Grab": {
+    "parent": "Travel",
+    "child": "General Travel"
+  },
+  "Bolt": {
+    "parent": "Travel",
+    "child": "General Travel"
+  },
+  "Beem It": {
+    "parent": "Transfers",
+    "child": "Money Transfers",
+    "is_transfer": true
+  },
+  "Deft": {
+    "parent": "Property",
+    "child": "Council & Water"
+  },
+  "ANZ": {
+    "parent": "Transfers",
+    "child": "Money Transfers",
+    "is_transfer": true
+  },
+  "Cuddles 4 Kids P": {
+    "parent": "Family",
+    "child": "Daycare"
+  },
+  "Y Bankstown Parramatta": {
+    "parent": "Health",
+    "child": "Kids"
+  },
+  "Cbc": {
+    "parent": "Property",
+    "child": "Council & Water"
+  },
+  "Canterbury Bankstown C Bankstown": {
+    "parent": "Property",
+    "child": "Council & Water"
+  },
+  "Iki Sushi N Grill Bankstown": {
+    "parent": "Food & Drink",
+    "child": "Restaurants"
+  },
+  "Awqaf Australia Ltd.\\": {
+    "parent": "Islam",
+    "child": "Zakat/Sadaqa"
+  },
+  "Zeekr Sydney City Waterloo": {
+    "parent": "Transport",
+    "child": "Car"
+  },
+  "Awqaf Australia Ltd. Lakemba": {
+    "parent": "Islam",
+    "child": "Zakat/Sadaqa"
+  },
+  "Ingleburn Medical Ingleburn": {
+    "parent": "Health",
+    "child": "GP / Medical"
+  },
+  "Mycard Credit Cards": {
+    "parent": "Financial",
+    "child": "Credit Card Payments"
+  },
+  "Bankstown Tyre Centre Bankstown": {
+    "parent": "Transport",
+    "child": "Maintenance"
+  },
+  "Launchgood Inc. 855 9991947": {
+    "parent": "Islam",
+    "child": "Zakat/Sadaqa"
+  },
+  "River Timber Designs Camperdown": {
+    "parent": "Shopping",
+    "child": "General"
+  },
+  "Jmj Fuels Pty Ltd Leeton": {
+    "parent": "Transport",
+    "child": "Fuel"
+  },
+  "Gfm*Gofundme Help Noor Ha Gofundme.Com": {
+    "parent": "Islam",
+    "child": "Zakat/Sadaqa"
+  },
+  "Xx Pty Ltd": {
+    "parent": "Uncategorised",
+    "child": "Uncategorised"
+  },
+  "Sydney Car Spa Pty Ltd Bankstown": {
+    "parent": "Transport",
+    "child": "Maintenance"
+  },
+  "Marjan Butchery Punchbowl": {
+    "parent": "Food & Drink",
+    "child": "Groceries"
+  },
+  "Bitwarden Bitwarden.Com": {
+    "parent": "Tech",
+    "child": "Subscriptions"
+  },
+  "Whw* Invoice 94062 Brisbane": {
+    "parent": "Uncategorised",
+    "child": "Uncategorised"
+  },
+  "Netlify Netlify.Com": {
+    "parent": "Tech",
+    "child": "Subscriptions"
+  },
+  "Sydney Water": {
+    "parent": "Property",
+    "child": "Council & Water"
+  },
+  "Ovo Energy": {
+    "parent": "Utilities",
+    "child": "Electricity"
+  },
+  "Globird Energy": {
+    "parent": "Utilities",
+    "child": "Electricity"
+  },
+  "Origin Energy": {
+    "parent": "Utilities",
+    "child": "Gas"
+  }
+}
