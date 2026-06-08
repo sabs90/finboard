@@ -52,7 +52,9 @@ Last updated: 2026-06-09
 - [x] Inline category reassignment via `<select>` with optgroups
 - [x] Month navigation (prev/next)
 - [x] Dev server verified working with real data (200 on /spending)
-- [ ] Design tokens / colour palette decided and documented
+- [x] Design tokens / colour palette decided and documented (Tailwind extended with surface + category colors)
+- [x] Full dark theme conversion (slate-950/900/800 palette across all components)
+- [x] Recharts installed and integrated for data visualization
 - [ ] Empty state screens for all 6 views
 - [ ] `docker/Dockerfile.dashboard` written
 - [ ] `docker/docker-compose.yml` written
@@ -70,11 +72,14 @@ Last updated: 2026-06-09
 
 #### 4a — Overview (Home)
 - [ ] Net worth figure (current, large)
-- [ ] Month-to-date spend vs budget summary
-- [ ] Savings rate this month
-- [ ] Biggest spend category this month
+- [x] Month-to-date spend KPI card
+- [x] Income KPI card
+- [x] Savings rate this month
+- [x] Biggest spend category this month
 - [ ] Portfolio return MTD
-- [ ] Recent transactions list (last 10)
+- [x] Recent transactions list (last 10)
+- [x] Spending by category donut chart
+- [x] Monthly spending bar chart (6 months)
 
 #### 4b — Budget vs Actual
 - [ ] Month selector (navigate to prior months)
@@ -84,9 +89,15 @@ Last updated: 2026-06-09
 - [ ] Initial budget amounts entered for all categories
 
 #### 4c — Spending by Category
-- [ ] Donut or treemap for current month
-- [ ] Month / 3-month / 12-month toggle
-- [ ] Drill-in to see transactions within a category
+- [x] Donut chart for current month
+- [x] Month navigation (prev/next)
+- [x] Category table with drill-down links to deep dive
+- [x] Category deep dive page with 12-month stacked bar chart, subcategory breakdown, top merchants, transactions
+- [x] Subcategory deep dive (click through from parent to child category)
+- [x] Period selector (This Month / 3M / 6M / 12M) on deep dive pages
+- [x] Comparison chips (vs last month, vs 3-month average)
+- [x] Dedicated "Deep Dive" page in sidebar with parent + subcategory selectors
+- [x] Subcategories have distinct colors reflected in stacked chart and bars
 
 #### 4d — Cash Flow
 - [ ] Waterfall chart: income → spends by category → net savings
@@ -99,10 +110,11 @@ Last updated: 2026-06-09
 - [ ] At least 3 months of history populated
 
 #### 4f — Transactions
-- [ ] Full transaction list, paginated
-- [ ] Filter by account, category, date range
-- [ ] Search by description
-- [ ] Inline category re-assignment
+- [x] Full transaction list, paginated (30 per page)
+- [x] Filter by account, category
+- [x] Search by description/merchant
+- [x] Inline category re-assignment
+- [ ] Filter by date range (month filter exists, custom range not yet)
 - [ ] Flag / note on individual transactions
 
 **Phase 4 complete**: [ ]
@@ -161,6 +173,23 @@ Last updated: 2026-06-09
 - Ingest pipeline now has 3-tier priority: merchant rules > description keyword rules > Frollo category mapping
 - Final state: 1,911 categorised expenses, 90 money transfers, 157 uncategorised
 - AMP CSV ingest still pending — user to provide sample CSV
+
+### Session 4 — Dashboard redesign + category deep dive (2026-06-09)
+- **Full dark theme conversion**: slate-950/900/800 palette across every component
+- **Recharts integrated**: donut charts, bar charts, stacked bar charts
+- **Overview page** (`/`): 4 KPI cards (spend, income, savings rate, top category), spending donut, 6-month bar chart, recent transactions
+- **Spending page** upgraded: donut chart alongside category table, categories link to deep dive
+- **Transactions page** (`/transactions`): search by description/merchant, filter by account/category, paginated (30/page), inline category reassignment
+- **Category deep dive** (`/spending/category/[id]`):
+  - Parent categories: stacked bar chart (12mo) with subcategory colors, subcategory breakdown bars, top merchants, transactions
+  - Child categories: simple bar chart with average line, top merchants, transactions
+  - Comparison chips: % vs last month, % vs 3-month average
+  - Period selector: This Month / 3M / 6M / 12M
+  - Click-through: subcategories link to their own deep dive, "Back to [parent]" breadcrumb
+- **Deep Dive page** (`/deep-dive`): dedicated sidebar nav item, parent + subcategory selectors, category grid for quick access
+- **Design system**: reusable Card/KpiCard components, 15-color subcategory palette, chartColors utility
+- 33 files changed, 18 new files created
+- **Next session**: Budget vs Actual (4b), Cash Flow (4d), Docker deployment, or Phase 2 (Sharesight)
 
 ### Session 1 — Phase 1: Data Foundation (2026-06-03)
 - Built `scripts/utils/db.py` — WAL-mode connection, FK enforcement, transaction context manager
