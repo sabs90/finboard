@@ -98,6 +98,7 @@ Last updated: 2026-06-09
 - [x] Comparison chips (vs last month, vs 3-month average)
 - [x] Dedicated "Deep Dive" page in sidebar with parent + subcategory selectors
 - [x] Subcategories have distinct colors reflected in stacked chart and bars
+- [x] Monthly Trends pivot table (6-month parent/child expand-collapse, avg column, frozen header)
 
 #### 4d — Cash Flow
 - [ ] Waterfall chart: income → spends by category → net savings
@@ -189,6 +190,7 @@ Last updated: 2026-06-09
 - **Deep Dive page** (`/deep-dive`): dedicated sidebar nav item, parent + subcategory selectors, category grid for quick access
 - **Design system**: reusable Card/KpiCard components, 15-color subcategory palette, chartColors utility
 - 33 files changed, 18 new files created
+- **Trends page** (`/trends`): Excel-style pivot table — 6 months × parent/child categories, expand/collapse rows, 0-decimal formatting, avg column, sticky header
 - **Next session**: Budget vs Actual (4b), Cash Flow (4d), Docker deployment, or Phase 2 (Sharesight)
 
 ### Session 1 — Phase 1: Data Foundation (2026-06-03)

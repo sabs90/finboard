@@ -104,6 +104,16 @@ export interface SubcategoryRow {
   total_cents: number;
 }
 
+export interface PivotRow {
+  parent_category_id: number | null;
+  parent_category: string;
+  parent_colour: string;
+  category_id: number | null;
+  category: string | null;
+  month: string;
+  total_cents: number;
+}
+
 export interface MerchantRow {
   merchant: string;
   total_cents: number;
@@ -642,4 +652,26 @@ export function getSubcategoryTransactions(
       AND t.transaction_date < ?
     ORDER BY t.transaction_date DESC, t.id DESC
   `).all(categoryId, startDate, endDate) as TransactionRow[];
+}
+
+export function getPivotData(months: number): PivotRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      COALESCE(c.parent_id, c.id) AS parent_category_id,
+      COALESCE(pc.name, c.name, 'Uncategorised') AS parent_category,
+      COALESCE(pc.colour, c.colour, '#9CA3AF') AS parent_colour,
+      t.category_id AS category_id,
+      c.name AS category,
+      strftime('%Y-%m', t.transaction_date) AS month,
+      ABS(SUM(t.amount_cents)) AS total_cents
+    FROM transactions t
+    LEFT JOIN categories c ON t.category_id = c.id
+    LEFT JOIN categories pc ON c.parent_id = pc.id
+    WHERE t.amount_cents < 0
+      AND t.is_transfer = 0
+      AND t.transaction_date >= date('now', '-' || ? || ' months', 'start of month')
+    GROUP BY COALESCE(c.parent_id, c.id), t.category_id, strftime('%Y-%m', t.transaction_date)
+    ORDER BY COALESCE(pc.sort_order, c.sort_order, 999), COALESCE(pc.name, c.name), c.sort_order, c.name, month
+  `).all(months) as PivotRow[];
 }

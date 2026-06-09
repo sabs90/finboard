@@ -10,6 +10,17 @@ export function formatCurrency(cents: number): string {
 }
 
 /**
+ * Format cents as whole-dollar AUD string (no decimals).
+ * e.g. 159742 → "$1,597"
+ */
+export function formatDollars(cents: number): string {
+  const abs = Math.abs(cents);
+  const dollars = Math.round(abs / 100).toString();
+  const formatted = '$' + dollars.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return cents < 0 ? `-${formatted}` : formatted;
+}
+
+/**
  * Format ISO date string (YYYY-MM-DD) to Australian format (DD MMM YYYY).
  */
 export function formatDate(isoDate: string): string {
