@@ -81,6 +81,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_dedup
     ON transactions(account_id, transaction_date, amount_cents, description)
     WHERE source = 'frollo';
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_dedup_amp
+    ON transactions(account_id, transaction_date, amount_cents, description)
+    WHERE source = 'amp';
+
 CREATE INDEX IF NOT EXISTS idx_transactions_date     ON transactions(transaction_date);
 CREATE INDEX IF NOT EXISTS idx_transactions_account  ON transactions(account_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category_id);
