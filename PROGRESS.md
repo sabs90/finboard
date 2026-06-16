@@ -305,6 +305,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_i
   - Net Worth History: Recharts LineChart (NW + Total Assets + Mortgage, 30 quarters)
   - Added "Balance Sheet" to Sidebar nav
 - Phase 2b + 2c + 2d complete ✓
+- Post-session fixes: asset/liability detail rows anchored to snapshot date; ingest carry-forward for formula cells with uncached results
 
 ### Session 5 — Phase 2 planning + balance sheet analysis (2026-06-16)
 - Reviewed uncommitted work from prior session: `scripts/ingest_amp.py` (complete) and `db_init.py` AMP dedup index
