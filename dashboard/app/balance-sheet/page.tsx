@@ -1,8 +1,10 @@
+import React from 'react';
 import {
   getLatestNetWorthSnapshot,
   getNetWorthHistory,
   getLatestLoanSnapshots,
   getLatestAssetBreakdown,
+  getAssetAccountDetails,
 } from '@/lib/db';
 import { formatDollars } from '@/lib/formatters';
 import { KpiCard } from '@/components/ui/KpiCard';
@@ -24,8 +26,14 @@ function propertyLabel(accountName: string): string {
 export default function BalanceSheetPage() {
   const snap = getLatestNetWorthSnapshot();
   const history = getNetWorthHistory();
-  const loans = getLatestLoanSnapshots();
+  const loans = snap ? getLatestLoanSnapshots(snap.snapshot_date) : [];
   const assetRows = getLatestAssetBreakdown();
+  const assetDetails = snap ? getAssetAccountDetails(snap.snapshot_date) : [];
+
+  const detailsByClass = assetDetails.reduce<Record<string, typeof assetDetails>>((acc, row) => {
+    (acc[row.asset_class] ??= []).push(row);
+    return acc;
+  }, {});
 
   if (!snap) {
     return (
@@ -112,27 +120,38 @@ export default function BalanceSheetPage() {
           </div>
           <div className="px-6 pb-6">
             <table className="w-full text-sm">
-              <tbody className="divide-y divide-slate-800">
+              <tbody>
                 {[
                   { label: 'Property',    cents: snap.property_value_cents,  color: '#8B5CF6' },
                   { label: 'Investments', cents: snap.investment_cents,       color: '#10B981' },
                   { label: 'Cash',        cents: snap.cash_cents,             color: '#3B82F6' },
                   { label: 'Other',       cents: snap.other_assets_cents,     color: '#F59E0B' },
                 ].map(({ label, cents, color }) => (
-                  <tr key={label}>
-                    <td className="py-2.5 flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                      <span className="text-slate-300">{label}</span>
-                    </td>
-                    <td className="py-2.5 text-right tabular-nums text-slate-100">
-                      {formatDollars(cents)}
-                    </td>
-                    <td className="py-2.5 text-right tabular-nums text-slate-500 pl-4 w-14">
-                      {snap.total_assets_cents > 0
-                        ? `${((cents / snap.total_assets_cents) * 100).toFixed(0)}%`
-                        : '—'}
-                    </td>
-                  </tr>
+                  <React.Fragment key={label}>
+                    <tr className="border-t border-slate-800">
+                      <td className="pt-3 pb-1.5 flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                        <span className="text-slate-300 font-medium">{label}</span>
+                      </td>
+                      <td className="pt-3 pb-1.5 text-right tabular-nums text-slate-100 font-medium">
+                        {formatDollars(cents)}
+                      </td>
+                      <td className="pt-3 pb-1.5 text-right tabular-nums text-slate-500 pl-4 w-14">
+                        {snap.total_assets_cents > 0
+                          ? `${((cents / snap.total_assets_cents) * 100).toFixed(0)}%`
+                          : '—'}
+                      </td>
+                    </tr>
+                    {(detailsByClass[label] ?? []).map((d) => (
+                      <tr key={d.account_name}>
+                        <td className="py-1 pl-5 text-slate-500">{d.account_name}</td>
+                        <td className="py-1 text-right tabular-nums text-slate-500">
+                          {formatDollars(d.balance_cents)}
+                        </td>
+                        <td />
+                      </tr>
+                    ))}
+                  </React.Fragment>
                 ))}
               </tbody>
               <tfoot>

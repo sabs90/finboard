@@ -224,8 +224,19 @@ def to_cents(value) -> Optional[int]:
 
 
 def read_row_cents(ws, excel_row: int, n: int) -> list[Optional[int]]:
-    """Read n quarterly values from excel_row, data starts at col 4 (1-based)."""
-    return [to_cents(ws.cell(row=excel_row, column=4 + i).value) for i in range(n)]
+    """
+    Read n quarterly values from excel_row, data starts at col 4 (1-based).
+    Carries forward the last known value when a cell is None — handles formula
+    cells whose cached results weren't saved in the xlsx file.
+    """
+    raw = [to_cents(ws.cell(row=excel_row, column=4 + i).value) for i in range(n)]
+    last: Optional[int] = None
+    result: list[Optional[int]] = []
+    for v in raw:
+        if v is not None:
+            last = v
+        result.append(last)
+    return result
 
 
 def read_row_floats(ws, excel_row: int, n: int) -> list[Optional[float]]:

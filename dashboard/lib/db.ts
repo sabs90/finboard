@@ -698,7 +698,7 @@ export function getNetWorthHistory(): NetWorthSnapshot[] {
   `).all() as NetWorthSnapshot[];
 }
 
-export function getLatestLoanSnapshots(): LoanSnapshotRow[] {
+export function getLatestLoanSnapshots(snapshotDate: string): LoanSnapshotRow[] {
   const db = getDb();
   return db.prepare(`
     SELECT
@@ -708,13 +708,53 @@ export function getLatestLoanSnapshots(): LoanSnapshotRow[] {
       ls.facility_type
     FROM loan_snapshots ls
     JOIN accounts a ON ls.account_id = a.id
-    WHERE ls.snapshot_date = (
-      SELECT MAX(ls2.snapshot_date)
-      FROM loan_snapshots ls2
-      WHERE ls2.account_id = ls.account_id
-    )
+    WHERE ls.snapshot_date = ?
+      AND ls.outstanding_cents > 0
     ORDER BY a.name
-  `).all() as LoanSnapshotRow[];
+  `).all(snapshotDate) as LoanSnapshotRow[];
+}
+
+export interface AssetDetailRow {
+  account_name: string;
+  asset_class: string;
+  balance_cents: number;
+}
+
+export function getAssetAccountDetails(snapshotDate: string): AssetDetailRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      a.name AS account_name,
+      ab.balance_cents,
+      CASE a.account_type
+        WHEN 'savings'     THEN 'Cash'
+        WHEN 'transaction' THEN 'Cash'
+        WHEN 'asset'       THEN 'Other'
+        ELSE CASE
+          WHEN a.institution IN ('CMC Markets', 'IG', 'Moelis', 'Stockland') THEN 'Investments'
+          ELSE 'Other'
+        END
+      END AS asset_class
+    FROM account_balances ab
+    JOIN accounts a ON ab.account_id = a.id
+    WHERE ab.balance_date = ?
+      AND a.source = 'manual'
+      AND a.account_type NOT IN ('liability', 'mortgage')
+      AND ab.balance_cents > 0
+
+    UNION ALL
+
+    SELECT
+      a.name AS account_name,
+      ast.value_cents AS balance_cents,
+      'Property' AS asset_class
+    FROM assets ast
+    JOIN accounts a ON ast.account_id = a.id
+    WHERE ast.valuation_date = ?
+      AND ast.value_cents > 0
+
+    ORDER BY asset_class, balance_cents DESC
+  `).all(snapshotDate, snapshotDate) as AssetDetailRow[];
 }
 
 export function getLatestAssetBreakdown(): AssetBreakdownRow[] {
