@@ -654,6 +654,88 @@ export function getSubcategoryTransactions(
   `).all(categoryId, startDate, endDate) as TransactionRow[];
 }
 
+// ── Balance Sheet ─────────────────────────────────────────────────────────────
+
+export interface NetWorthSnapshot {
+  snapshot_date: string;
+  total_assets_cents: number;
+  total_liabilities_cents: number;
+  net_worth_cents: number;
+  cash_cents: number;
+  investment_cents: number;
+  property_value_cents: number;
+  property_equity_cents: number;
+  other_assets_cents: number;
+  mortgage_cents: number;
+  other_liabilities_cents: number;
+}
+
+export interface LoanSnapshotRow {
+  account_name: string;
+  outstanding_cents: number;
+  interest_rate: number | null;
+  facility_type: string | null;
+}
+
+export interface AssetBreakdownRow {
+  account_name: string;
+  account_type: string;
+  balance_cents: number;
+}
+
+export function getLatestNetWorthSnapshot(): NetWorthSnapshot | null {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT * FROM net_worth_snapshots ORDER BY snapshot_date DESC LIMIT 1
+  `).get() as NetWorthSnapshot | undefined;
+  return row ?? null;
+}
+
+export function getNetWorthHistory(): NetWorthSnapshot[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT * FROM net_worth_snapshots ORDER BY snapshot_date ASC
+  `).all() as NetWorthSnapshot[];
+}
+
+export function getLatestLoanSnapshots(): LoanSnapshotRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      a.name AS account_name,
+      ls.outstanding_cents,
+      ls.interest_rate,
+      ls.facility_type
+    FROM loan_snapshots ls
+    JOIN accounts a ON ls.account_id = a.id
+    WHERE ls.snapshot_date = (
+      SELECT MAX(ls2.snapshot_date)
+      FROM loan_snapshots ls2
+      WHERE ls2.account_id = ls.account_id
+    )
+    ORDER BY a.name
+  `).all() as LoanSnapshotRow[];
+}
+
+export function getLatestAssetBreakdown(): AssetBreakdownRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      a.name AS account_name,
+      a.account_type,
+      ab.balance_cents
+    FROM account_balances ab
+    JOIN accounts a ON ab.account_id = a.id
+    WHERE ab.balance_date = (
+      SELECT MAX(ab2.balance_date)
+      FROM account_balances ab2
+      WHERE ab2.account_id = ab.account_id
+    )
+      AND a.source = 'manual'
+    ORDER BY a.account_type, a.name
+  `).all() as AssetBreakdownRow[];
+}
+
 export function getPivotData(months: number): PivotRow[] {
   const db = getDb();
   return db.prepare(`

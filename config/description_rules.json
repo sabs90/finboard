@@ -423,7 +423,7 @@
   },
   "lanzhou": {
     "parent": "Food & Drink",
-    "child": "Takeaway"
+    "child": "Restaurants"
   },
   "donuts": {
     "parent": "Food & Drink",
@@ -576,5 +576,51 @@
   "bluefit": {
     "parent": "Health",
     "child": "Kids"
+  },
+  "ezypay": {
+    "parent": "Health",
+    "child": "Gym"
+  },
+  "loan payment": {
+    "parent": "Transfers",
+    "child": "Money Transfers",
+    "is_transfer": true
+  },
+  "hsbc everyday expenses": {
+    "parent": "Transfers",
+    "child": "Money Transfers",
+    "is_transfer": true
+  },
+  "kheizaran": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "chalk investments": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "rumah": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "dunhuang": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "luca": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "jerky": {
+    "parent": "Food & Drink",
+    "child": "Takeaway"
+  },
+  "target": {
+    "parent": "Shopping",
+    "child": "Clothing"
+  },
+  "iki": {
+    "parent": "Food & Drink",
+    "child": "Restaurants"
   }
 }

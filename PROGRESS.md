@@ -1,6 +1,6 @@
 # PROGRESS.md — Finboard Build Tracker
 
-Last updated: 2026-06-09
+Last updated: 2026-06-16 (Session 6)
 
 ---
 
@@ -27,13 +27,126 @@ Last updated: 2026-06-09
 ---
 
 ### Phase 2 — Investments + Net Worth
-**Goal**: Sharesight connected, net worth calculation working.
+**Goal**: Sharesight connected, net worth calculation working. Balance sheet page live in dashboard.
 
+#### 2a — AMP Transaction Ingest (complete)
+- [x] `scripts/ingest_amp.py` — parses AMP CSV format (header skip, DD-Mon-YY dates, Balance column)
+- [x] `scripts/db_init.py` — updated with AMP dedup index (`source = 'amp'`)
+- [x] Committed (Session 6)
+
+#### 2b — Balance Sheet Database Tables (complete)
+Two new tables added as migration in `scripts/db_init.py`:
+
+```sql
+-- Quarterly balances for cash/investment accounts (fed from balance sheet xlsx)
+CREATE TABLE IF NOT EXISTS account_balances (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id      INTEGER NOT NULL REFERENCES accounts(id),
+    balance_date    TEXT NOT NULL,       -- YYYY-MM-DD (quarter-end)
+    balance_cents   INTEGER NOT NULL,
+    source          TEXT NOT NULL DEFAULT 'manual',
+    created_at      INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_account_balances ON account_balances(account_id, balance_date);
+
+-- Quarterly loan facility snapshots (balance + interest rate)
+CREATE TABLE IF NOT EXISTS loan_snapshots (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id          INTEGER NOT NULL REFERENCES accounts(id),
+    snapshot_date       TEXT NOT NULL,   -- YYYY-MM-DD (quarter-end)
+    outstanding_cents   INTEGER NOT NULL,
+    interest_rate       REAL,            -- decimal e.g. 0.0619 = 6.19%
+    facility_type       TEXT,            -- 'fixed' or 'variable'
+    source              TEXT NOT NULL DEFAULT 'manual',
+    created_at          INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_id, snapshot_date);
+```
+
+#### 2c — Balance Sheet Ingest Script (complete)
+- [x] `scripts/ingest_balance_sheet.py` — parses `data/Balance Sheet (1).xlsx`, loads 30 quarters of data
+
+**Spreadsheet structure** (`data/Balance Sheet (1).xlsx`, single sheet "Balance Sheet"):
+- Columns D–AG (0-based indices 3–32) = quarterly dates, starting 2018-12-31, each +3 months
+- Date generation: col index n → date = end of month for (2018-12-31 + (n−3) quarters)
+- Dates confirmed: index 3=2018-12-31, index 11=2020-12-31, index 31=2025-12-31, index 32=2026-03-31
+
+**Row map** (1-based Excel rows):
+| Row | Label | Type |
+|-----|-------|------|
+| 6  | ANZ Access (offset) | cash |
+| 7  | NAB Offset | cash |
+| 8  | Citi | cash |
+| 9  | ING | cash |
+| 19 | AMP | cash |
+| 20 | HSBC - Savings | cash |
+| 21 | HSBC - expense | cash |
+| 27 | CMC | investments |
+| 28 | IG Markets | investments |
+| 29 | Moelis | investments |
+| 30 | Stockland | investments |
+| 34 | Crypto | other |
+| 35 | Qawamah Capital | other |
+| 49 | 8/55 Alice st | property |
+| 50 | 8 Yarran st | property |
+| 51 | Toyota 86 | vehicle |
+| 52 | Hyundai i30 | vehicle |
+| 60 | Credit Cards | liability_other |
+| 61 | Sabeeh - tax bill | liability_other |
+| 64 | 8/55 Alice st (fixed) | mortgage — Alice St, Facility A (fixed) |
+| 65 | 8/55 Alice st (variable) | mortgage — Alice St, Facility B (variable) |
+| 66 | 8 Yarran st (fixed) | mortgage — Yarran St, Facility A (fixed) |
+| 67 | 8 Yarran st (variable) | mortgage — Yarran St, Facility B (variable) |
+| 113 | Int Rate — Yarran Facility A | rate (only populated cols 31+) |
+| 117 | Int Rate — Yarran Facility B | rate (only populated cols 31+) |
+| 122 | Int Rate — Alice Facility A | rate (only populated cols 31+) |
+| 126 | Int Rate — Alice Facility B | rate (only populated cols 31+) |
+
+**NOTE**: Row 66 (Yarran fixed) shows $1,037,000 at 2026-03-31 — big jump from $813,788. Likely a refinancing top-up. Verify with Sabs before treating as correct.
+
+**Subtotals are all None** (formula cells without cached values). Must compute manually by summing raw rows.
+
+**Script logic**:
+1. Generate quarterly dates for col indices 3–32
+2. For each account row: create account in `accounts` if not exists, insert into `account_balances` (upsert)
+3. For property rows: also insert into `assets` table
+4. For mortgage rows: create loan accounts, insert into `loan_snapshots`; attach interest rates where available (cols 31–32)
+5. Compute and upsert `net_worth_snapshots` per quarter:
+   - `cash_cents` = sum of rows 6,7,8,9,19,20,21
+   - `investment_cents` = sum of rows 27,28,29,30
+   - `property_value_cents` = sum of rows 49,50
+   - `other_assets_cents` = vehicles (51,52) + crypto (34,35) + receivables (41,42)
+   - `mortgage_cents` = sum of rows 64,65,66,67
+   - `other_liabilities_cents` = sum of rows 60,61
+   - `total_assets_cents` = all asset rows summed
+   - `total_liabilities_cents` = mortgage + other liabilities
+   - `net_worth_cents` = total assets − total liabilities
+   - `property_equity_cents` = property_value − mortgage
+
+**Update strategy**: Keep `data/Balance Sheet (1).xlsx` updated quarterly, re-run script (it upserts so safe to re-run).
+
+#### 2d — Dashboard Balance Sheet Page (complete)
+- [x] `dashboard/app/balance-sheet/page.tsx` — balance sheet page
+- [x] `dashboard/components/layout/Sidebar.tsx` — "Balance Sheet" nav item added
+- [x] `dashboard/components/charts/NetWorthHistoryChart.tsx` — quarterly line chart
+- [x] `dashboard/lib/db.ts` — 4 new queries: getLatestNetWorthSnapshot, getNetWorthHistory, getLatestLoanSnapshots, getLatestAssetBreakdown
+
+**Page layout**:
+1. **KPI row** — Net Worth (large) | Total Assets | Total Liabilities (from latest `net_worth_snapshots` row)
+2. **Asset breakdown** (left column) — donut chart + table: Cash / Investments / Property / Vehicles / Other
+3. **Liability breakdown** (right column) — table: 4 mortgage facilities + credit cards/other
+4. **Debt Summary** (full width) — table with columns: Property | Facility | Type | Balance | Rate | Annual Interest. Footer row: Total | | | $X | Wtd Avg Rate% | $X p.a.
+5. **Net Worth History** (full width) — Recharts LineChart, quarterly from 2018, data from `net_worth_snapshots`
+
+**DB queries needed** in `dashboard/lib/db.ts`:
+- `getLatestNetWorthSnapshot()` → latest row from `net_worth_snapshots`
+- `getNetWorthHistory()` → all rows from `net_worth_snapshots` ordered by date
+- `getLatestLoanSnapshots()` → most recent `loan_snapshots` per account (with account name, facility_type, interest_rate)
+- `getAssetBreakdown()` → latest `account_balances` per account, joined with `accounts` for type
+
+#### 2e — Sharesight (deferred — needs API credentials)
 - [ ] `SHARESIGHT_SETUP.md` — OAuth setup instructions
 - [ ] `scripts/sync_sharesight.py` — pulls portfolio positions → `portfolio_positions` table
-- [ ] `scripts/sync_property.py` — CLI for manual property value entry
-- [ ] `scripts/net_worth.py` — calculates and stores net worth snapshots
-- [ ] Net worth calculation verified manually against known figures
 - [ ] Cron job configured in DSM Task Scheduler
 
 **Phase 2 complete**: [ ]
@@ -174,6 +287,36 @@ Last updated: 2026-06-09
 - Ingest pipeline now has 3-tier priority: merchant rules > description keyword rules > Frollo category mapping
 - Final state: 1,911 categorised expenses, 90 money transfers, 157 uncategorised
 - AMP CSV ingest still pending — user to provide sample CSV
+
+### Session 6 — Phase 2b/2c/2d: Balance Sheet end-to-end (2026-06-16)
+- Committed AMP ingest work (was done but unstaged)
+- Added `account_balances` and `loan_snapshots` tables to `scripts/db_init.py`
+- Wrote `scripts/ingest_balance_sheet.py`:
+  - Reads 30 quarters (2018-12-31 → 2026-03-31) from xlsx with `openpyxl data_only=True`
+  - Generates quarter-end dates programmatically; xlsx row 1 only has one cached date
+  - All values stored as integer cents, upserted on re-run
+  - 281 account_balances, 93 loan_snapshots, 30 net_worth_snapshots loaded
+  - Note: 2025-09-30 quarter has many blank cells in source spreadsheet — net worth shown as -$1.05M for that quarter; source data needs completing
+- Built dashboard Balance Sheet page (`/balance-sheet`):
+  - KPI row: Net Worth / Total Assets / Total Liabilities
+  - Asset breakdown: donut chart (Property/Investments/Cash/Other) + category table
+  - Liability breakdown: mortgage subtable + other liabilities (credit cards, tax)
+  - Debt Summary: full-width table with facility type badges, interest rates, annual interest, weighted avg rate footer
+  - Net Worth History: Recharts LineChart (NW + Total Assets + Mortgage, 30 quarters)
+  - Added "Balance Sheet" to Sidebar nav
+- Phase 2b + 2c + 2d complete ✓
+
+### Session 5 — Phase 2 planning + balance sheet analysis (2026-06-16)
+- Reviewed uncommitted work from prior session: `scripts/ingest_amp.py` (complete) and `db_init.py` AMP dedup index
+- Fully analysed `data/Balance Sheet (1).xlsx`:
+  - 30 quarterly snapshots from 2018-12-31 to 2026-03-31
+  - Row-by-row mapping confirmed for all assets and liabilities
+  - Subtotals are all None (uncached SUBTOTAL formulas) — must sum manually
+  - Interest rates only populated for Q4 2025 and Q1 2026 (Yarran A: 5.43%→6.19%, Yarran B: 6.04%, Alice A+B: 6.10%→6.60%)
+  - Notable: Yarran St (fixed) jumps from $813k to $1,037k at Q1 2026 — possible refinancing top-up, verify
+- Decided full plan for Phase 2b/2c/2d — documented above in detail
+- **Session ended before writing any code** — full plan captured in PROGRESS.md
+- **Next session**: implement 2b (schema tables), 2c (ingest script), 2d (dashboard page) in that order. Commit AMP work first.
 
 ### Session 4 — Dashboard redesign + category deep dive (2026-06-09)
 - **Full dark theme conversion**: slate-950/900/800 palette across every component

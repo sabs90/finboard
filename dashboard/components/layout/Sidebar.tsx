@@ -12,6 +12,7 @@ const navItems = [
   { href: '/cashflow', label: 'Cash Flow', exact: false },
   { href: '/networth', label: 'Net Worth', exact: false },
   { href: '/transactions', label: 'Transactions', exact: false },
+  { href: '/balance-sheet', label: 'Balance Sheet', exact: false },
 ];
 
 export function Sidebar() {

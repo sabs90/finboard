@@ -136,6 +136,30 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_portfolio_position
 CREATE INDEX IF NOT EXISTS idx_portfolio_date
     ON portfolio_positions(sync_date);
 
+-- ── account_balances ─────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS account_balances (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id      INTEGER NOT NULL REFERENCES accounts(id),
+    balance_date    TEXT NOT NULL,
+    balance_cents   INTEGER NOT NULL,
+    source          TEXT NOT NULL DEFAULT 'manual',
+    created_at      INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_account_balances ON account_balances(account_id, balance_date);
+
+-- ── loan_snapshots ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS loan_snapshots (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id          INTEGER NOT NULL REFERENCES accounts(id),
+    snapshot_date       TEXT NOT NULL,
+    outstanding_cents   INTEGER NOT NULL,
+    interest_rate       REAL,
+    facility_type       TEXT,
+    source              TEXT NOT NULL DEFAULT 'manual',
+    created_at          INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_id, snapshot_date);
+
 -- ── net_worth_snapshots ───────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS net_worth_snapshots (
     id                          INTEGER PRIMARY KEY AUTOINCREMENT,
