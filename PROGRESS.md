@@ -289,6 +289,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_i
 - Final state: 1,911 categorised expenses, 90 money transfers, 157 uncategorised
 - AMP CSV ingest still pending — user to provide sample CSV
 
+### Session 8 (cont.) — Data import + category rules in dashboard (2026-06-18)
+- Built the full review action plan (items 1–7, all shipped — see `REVIEW_PLAN.md`).
+- New feature: **rules + CSV import moved into the dashboard** (3 stages, all committed):
+  - **Stage 1** — `category_rules` SQLite table is now the single source of truth for
+    auto-categorisation. `migrate_rules_to_db.py` moved 260 JSON rules (105 merchant + 155
+    description) into it; `ingest_frollo.py` reads rules from the table (`load_rules_from_db`),
+    resolver unchanged. JSON files kept as backup. AMP keeps its own minimal categorisation.
+  - **Stage 2** — `/rules` page: create keyword/merchant rules (applied live to ALL matching
+    transactions + persisted), live match-count preview, list/delete. One-off edits stay inline.
+  - **Stage 3** — `/import` page: upload Frollo/AMP CSV → server action saves it + runs the Python
+    ingest via `spawn` (no shell) → streams the log. Dedupes; safe to re-run.
+- Sidebar gained a "Manage" section (Import Data, Category Rules).
+- **Deferred/notes**: app currently runs Python + dashboard on the same host (no Dockerfile yet);
+  the import action assumes `python3` + scripts are reachable — revisit when Dockerising.
+
 ### Session 8 — Full site review + action plan (2026-06-17)
 - Reviewed all 9 routes, data layer, UI primitives, styling. Typecheck clean.
 - Findings: strong visual system; IA is the weak point (9 flat nav items, overlapping spending views, NW/BS ~80% duplicated, two dead links → 404).
@@ -391,6 +406,8 @@ See **`REVIEW_PLAN.md`** for the full post-review action checklist (Session 8).
 | 6 | Frollo CSV export (not API) | 0 | Frollo has no consumer API; CSV is the only personal-use egress path |
 | 7 | 3-tier category resolution | 3 | Merchant rules > description keywords > Frollo category. Handles HSBC raw descriptions where Frollo can't identify merchant |
 | 8 | CSV-based category review workflow | 3 | Export → user edits in Numbers/Excel → re-import. Repeatable for ongoing cleanup |
+| 9 | Category rules in SQLite (`category_rules`), not JSON | 8 | Single source of truth shared by dashboard + ingest. Dashboard creates rules + applies live; ingest reads the table. JSON files retired (kept as backup) |
+| 10 | CSV import + categorisation done in-dashboard | 8 | Upload triggers the existing Python ingest via a server action; rules created/edited live. Replaces the CSV export/edit/re-import loop for ongoing use |
 
 ---
 

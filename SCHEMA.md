@@ -151,6 +151,30 @@ CREATE UNIQUE INDEX idx_budgets_category_month ON budgets(category_id, month);
 
 ---
 
+### `category_rules`
+
+Auto-categorisation rules — the single source of truth, replacing the legacy
+`config/merchant_rules.json` and `config/description_rules.json` (migrated in via
+`scripts/migrate_rules_to_db.py`). Read by the ingest scripts and maintained from
+the dashboard `/rules` page. Priority at ingest: merchant > description > Frollo map.
+
+```sql
+CREATE TABLE category_rules (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    rule_type       TEXT NOT NULL,          -- 'merchant' (exact) | 'description' (keyword substring)
+    pattern         TEXT NOT NULL,          -- merchant name, or keyword (lowercase) for description
+    category_id     INTEGER NOT NULL REFERENCES categories(id),
+    is_transfer     INTEGER NOT NULL DEFAULT 0,
+    source          TEXT NOT NULL DEFAULT 'manual',
+    created_at      INTEGER NOT NULL,
+    updated_at      INTEGER NOT NULL
+);
+
+CREATE UNIQUE INDEX idx_category_rules ON category_rules(rule_type, pattern);
+```
+
+---
+
 ### `assets`
 
 Point-in-time valuations for non-transaction assets (property, property equity).
