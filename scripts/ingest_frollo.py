@@ -72,22 +72,38 @@ def load_category_map() -> dict:
         return json.load(f)
 
 
-def load_merchant_rules() -> dict:
-    """Load merchant → category rules from config/merchant_rules.json (if it exists)."""
-    rules_path = Path(__file__).parent.parent / "config" / "merchant_rules.json"
-    if rules_path.exists():
-        with open(rules_path, encoding="utf-8") as f:
-            return json.load(f)
-    return {}
+def load_rules_from_db(conn) -> tuple[dict, dict]:
+    """Load categorisation rules from the category_rules table (single source of truth).
 
+    Returns (merchant_rules, description_rules), each as
+    {pattern: {"parent": str, "child": str|None, "is_transfer"?: True}} —
+    the same shape resolve_category() expects, so the resolver is unchanged.
+    """
+    rows = conn.execute(
+        """
+        SELECT r.rule_type, r.pattern, r.is_transfer,
+               c.name AS child_name, c.parent_id, pc.name AS parent_name
+        FROM category_rules r
+        JOIN categories c ON r.category_id = c.id
+        LEFT JOIN categories pc ON c.parent_id = pc.id
+        """
+    ).fetchall()
 
-def load_description_rules() -> dict:
-    """Load description keyword → category rules from config/description_rules.json (if it exists)."""
-    rules_path = Path(__file__).parent.parent / "config" / "description_rules.json"
-    if rules_path.exists():
-        with open(rules_path, encoding="utf-8") as f:
-            return json.load(f)
-    return {}
+    merchant_rules: dict = {}
+    description_rules: dict = {}
+    for row in rows:
+        if row["parent_id"] is None:
+            parent, child = row["child_name"], None
+        else:
+            parent, child = row["parent_name"], row["child_name"]
+        entry: dict = {"parent": parent, "child": child}
+        if row["is_transfer"]:
+            entry["is_transfer"] = True
+        if row["rule_type"] == "merchant":
+            merchant_rules[row["pattern"]] = entry
+        else:
+            description_rules[row["pattern"]] = entry
+    return merchant_rules, description_rules
 
 
 def _resolve_mapping(
@@ -425,9 +441,8 @@ def main() -> None:
     args = parser.parse_args()
 
     category_map = load_category_map()
-    merchant_rules = load_merchant_rules()
-    description_rules = load_description_rules()
     conn = get_connection()
+    merchant_rules, description_rules = load_rules_from_db(conn)
     stats = IngestStats()
 
     if merchant_rules:

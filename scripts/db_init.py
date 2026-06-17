@@ -178,6 +178,23 @@ CREATE TABLE IF NOT EXISTS net_worth_snapshots (
     created_at                  INTEGER NOT NULL
 );
 
+-- ── category_rules ────────────────────────────────────────────────────────────
+-- Single source of truth for automatic categorisation. Replaces the JSON rule
+-- files (config/merchant_rules.json, config/description_rules.json), which are
+-- migrated in via scripts/migrate_rules_to_db.py. Read by the ingest scripts and
+-- maintained from the dashboard /rules page.
+CREATE TABLE IF NOT EXISTS category_rules (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    rule_type       TEXT NOT NULL,              -- 'merchant' (exact) | 'description' (keyword substring)
+    pattern         TEXT NOT NULL,              -- merchant name, or keyword (lowercase) for description
+    category_id     INTEGER NOT NULL REFERENCES categories(id),
+    is_transfer     INTEGER NOT NULL DEFAULT 0,
+    source          TEXT NOT NULL DEFAULT 'manual',
+    created_at      INTEGER NOT NULL,
+    updated_at      INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_category_rules ON category_rules(rule_type, pattern);
+
 -- ── views ─────────────────────────────────────────────────────────────────────
 DROP VIEW IF EXISTS v_monthly_spend;
 CREATE VIEW v_monthly_spend AS
