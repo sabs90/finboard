@@ -1,12 +1,14 @@
 'use client';
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/formatters';
 
 interface DonutDataItem {
   name: string;
   value: number;
   color: string;
+  categoryId?: number | null;
 }
 
 interface CustomTooltipProps {
@@ -32,6 +34,13 @@ function DonutTooltip({ active, payload }: CustomTooltipProps) {
 
 export function SpendingDonut({ data }: { data: DonutDataItem[] }) {
   const total = data.reduce((sum, d) => sum + d.value, 0);
+  const router = useRouter();
+
+  function drill(item: DonutDataItem) {
+    if (item.categoryId != null) {
+      router.push(`/deep-dive?parent=${item.categoryId}`);
+    }
+  }
 
   return (
     <div className="flex flex-col items-center">
@@ -47,9 +56,14 @@ export function SpendingDonut({ data }: { data: DonutDataItem[] }) {
               dataKey="value"
               stroke="none"
               paddingAngle={2}
+              onClick={(_, index) => drill(data[index])}
             >
               {data.map((entry, i) => (
-                <Cell key={i} fill={entry.color} />
+                <Cell
+                  key={i}
+                  fill={entry.color}
+                  className={entry.categoryId != null ? 'cursor-pointer focus:outline-none' : ''}
+                />
               ))}
             </Pie>
             <Tooltip content={<DonutTooltip />} />
@@ -75,12 +89,23 @@ export function SpendingDonut({ data }: { data: DonutDataItem[] }) {
         </ResponsiveContainer>
       </div>
       <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 mt-2 w-full max-w-sm">
-        {data.map((item) => (
-          <div key={item.name} className="flex items-center gap-2 text-sm">
-            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-            <span className="text-slate-400 truncate">{item.name}</span>
-          </div>
-        ))}
+        {data.map((item) => {
+          const clickable = item.categoryId != null;
+          return (
+            <button
+              key={item.name}
+              type="button"
+              onClick={() => drill(item)}
+              disabled={!clickable}
+              className={`flex items-center gap-2 text-sm text-left ${
+                clickable ? 'hover:text-slate-100 cursor-pointer' : 'cursor-default'
+              }`}
+            >
+              <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+              <span className="text-slate-400 truncate hover:text-inherit">{item.name}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

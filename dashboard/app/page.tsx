@@ -7,19 +7,21 @@ import { SpendingDonut } from '@/components/charts/SpendingDonut';
 import { MonthlyBarChart } from '@/components/charts/MonthlyBarChart';
 import { getCategoryColor } from '@/lib/chartColors';
 
-function prepareDonutData(rows: { parent_category: string; colour: string; total_cents: number }[]) {
+function prepareDonutData(rows: { parent_category: string; category_id: number | null; colour: string; total_cents: number }[]) {
   const top = rows.slice(0, 8);
   const rest = rows.slice(8);
   const items = top.map((r) => ({
     name: r.parent_category,
     value: r.total_cents,
     color: r.colour || getCategoryColor(r.parent_category),
+    categoryId: r.category_id,
   }));
   if (rest.length > 0) {
     items.push({
       name: 'Other',
       value: rest.reduce((sum, r) => sum + r.total_cents, 0),
       color: '#6B7280',
+      categoryId: null,
     });
   }
   return items;

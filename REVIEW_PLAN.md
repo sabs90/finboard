@@ -71,11 +71,12 @@ The two pages were ~80% duplicated. Each now has a distinct job (not merged).
 
 ---
 
-## 4. 🟡 Make donut slices drillable
+## 4. 🟡 Make donut slices drillable ✅ DONE (Session 8)
 
-- [ ] Overview + Spending donuts: clicking a slice navigates to that category's Deep Dive
-      (`/deep-dive?parent=<id>`). Routes + data already exist — this is wiring in `SpendingDonut`.
-- [ ] Acceptance: click a slice → land on that category's deep dive
+- [x] `getCategoryBreakdown` now returns the parent `category_id`; both `prepareDonutData` helpers carry it.
+- [x] `SpendingDonut` slices + legend entries route to `/deep-dive?parent=<id>` on click (useRouter).
+- [x] Non-clickable where there's no id: the aggregated "Other" slice and the Balance Sheet asset donut.
+- [x] Verified: breakdown returns parent ids; `/deep-dive?parent=3` resolves 200; typecheck clean.
 
 ---
 

@@ -52,6 +52,7 @@ export interface OverviewKpis {
 
 export interface CategoryBreakdownRow {
   parent_category: string;
+  category_id: number | null;
   colour: string;
   total_cents: number;
 }
@@ -326,6 +327,7 @@ export function getCategoryBreakdown(month: string): CategoryBreakdownRow[] {
   return db.prepare(`
     SELECT
       COALESCE(pc.name, c.name, 'Uncategorised') AS parent_category,
+      COALESCE(pc.id, c.id) AS category_id,
       COALESCE(pc.colour, c.colour, '#9CA3AF') AS colour,
       ABS(SUM(t.amount_cents)) AS total_cents
     FROM transactions t
@@ -334,7 +336,7 @@ export function getCategoryBreakdown(month: string): CategoryBreakdownRow[] {
     WHERE strftime('%Y-%m', t.transaction_date) = ?
       AND t.amount_cents < 0
       AND t.is_transfer = 0
-    GROUP BY COALESCE(pc.name, c.name), COALESCE(pc.colour, c.colour)
+    GROUP BY COALESCE(pc.id, c.id), COALESCE(pc.name, c.name), COALESCE(pc.colour, c.colour)
     ORDER BY total_cents DESC
   `).all(month) as CategoryBreakdownRow[];
 }
