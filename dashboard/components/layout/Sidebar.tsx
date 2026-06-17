@@ -43,6 +43,12 @@ const navSections: NavSection[] = [
       { href: '/balance-sheet', label: 'Balance Sheet' },
     ],
   },
+  {
+    heading: 'Manage',
+    items: [
+      { href: '/rules', label: 'Category Rules' },
+    ],
+  },
 ];
 
 export function Sidebar({ dataAsOf }: { dataAsOf?: string | null }) {

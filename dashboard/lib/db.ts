@@ -454,6 +454,96 @@ export function searchTransactions(params: TransactionSearchParams): Transaction
   return { transactions, total: countRow.cnt };
 }
 
+// ── Category rules ────────────────────────────────────────────────────────────
+
+export type RuleType = 'merchant' | 'description';
+
+export interface CategoryRuleRow {
+  id: number;
+  rule_type: RuleType;
+  pattern: string;
+  category_id: number;
+  category: string;
+  parent_category: string | null;
+  colour: string;
+  is_transfer: number;
+}
+
+export function getCategoryRules(): CategoryRuleRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      r.id, r.rule_type, r.pattern, r.category_id, r.is_transfer,
+      c.name AS category,
+      pc.name AS parent_category,
+      COALESCE(pc.colour, c.colour, '#9CA3AF') AS colour
+    FROM category_rules r
+    JOIN categories c ON r.category_id = c.id
+    LEFT JOIN categories pc ON c.parent_id = pc.id
+    ORDER BY r.rule_type, r.pattern
+  `).all() as CategoryRuleRow[];
+}
+
+/** Count transactions a rule would match (for preview before applying). */
+export function countRuleMatches(ruleType: RuleType, pattern: string): number {
+  const db = getDb();
+  const p = pattern.trim();
+  if (!p) return 0;
+  if (ruleType === 'description') {
+    const row = db.prepare(
+      `SELECT COUNT(*) AS n FROM transactions WHERE LOWER(description) LIKE '%' || ? || '%'`
+    ).get(p.toLowerCase()) as { n: number };
+    return row.n;
+  }
+  const row = db.prepare(`SELECT COUNT(*) AS n FROM transactions WHERE merchant = ?`).get(p) as { n: number };
+  return row.n;
+}
+
+/**
+ * Create (or update) a rule and apply it to ALL matching transactions.
+ * Returns the number of transactions updated.
+ */
+export function createCategoryRule(ruleType: RuleType, pattern: string, categoryId: number): { affected: number } {
+  const db = getDb();
+  const cat = db.prepare(`
+    SELECT c.id, c.parent_id, c.name, pc.name AS parent_name
+    FROM categories c LEFT JOIN categories pc ON c.parent_id = pc.id
+    WHERE c.id = ?
+  `).get(categoryId) as { id: number; parent_id: number | null; name: string; parent_name: string | null } | undefined;
+  if (!cat) return { affected: 0 };
+
+  const storedPattern = ruleType === 'description' ? pattern.trim().toLowerCase() : pattern.trim();
+  if (!storedPattern) return { affected: 0 };
+
+  const isTransfer = cat.name === 'Money Transfers' && cat.parent_name === 'Transfers' ? 1 : 0;
+  const parentCategoryId = cat.parent_id;
+
+  const apply = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO category_rules (rule_type, pattern, category_id, is_transfer, source, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 'manual', unixepoch(), unixepoch())
+      ON CONFLICT(rule_type, pattern) DO UPDATE SET
+        category_id = excluded.category_id,
+        is_transfer = excluded.is_transfer,
+        updated_at = unixepoch()
+    `).run(ruleType, storedPattern, categoryId, isTransfer);
+
+    const sql = ruleType === 'description'
+      ? `UPDATE transactions SET category_id = ?, parent_category_id = ?, is_transfer = ?, updated_at = unixepoch()
+         WHERE LOWER(description) LIKE '%' || ? || '%'`
+      : `UPDATE transactions SET category_id = ?, parent_category_id = ?, is_transfer = ?, updated_at = unixepoch()
+         WHERE merchant = ?`;
+    return db.prepare(sql).run(categoryId, parentCategoryId, isTransfer, storedPattern).changes;
+  });
+
+  return { affected: apply() };
+}
+
+export function deleteCategoryRule(id: number): void {
+  const db = getDb();
+  db.prepare(`DELETE FROM category_rules WHERE id = ?`).run(id);
+}
+
 export interface DataFreshness {
   latestTransaction: string | null;
   transactionCount: number;
