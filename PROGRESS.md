@@ -289,6 +289,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_i
 - Final state: 1,911 categorised expenses, 90 money transfers, 157 uncategorised
 - AMP CSV ingest still pending — user to provide sample CSV
 
+### Session 8 — Full site review + action plan (2026-06-17)
+- Reviewed all 9 routes, data layer, UI primitives, styling. Typecheck clean.
+- Findings: strong visual system; IA is the weak point (9 flat nav items, overlapping spending views, NW/BS ~80% duplicated, two dead links → 404).
+- Decisions: build both `/budget` + `/cashflow`; keep NW + BS separate but differentiate (NW = trend/summary, BS = detailed positions); do not merge.
+- Captured full prioritised checklist in `REVIEW_PLAN.md`.
+- **Next**: work `REVIEW_PLAN.md` top-down — item 1 (build Budget + Cash Flow pages) first.
+
 ### Session 7 — Net Worth page + Overview hero + Balance Sheet history table (2026-06-17)
 - Added net worth hero card to Overview — large figure, equity/invest/cash breakdown, links to /networth
 - Built `/networth` page: stacked area chart (30 quarters), KPI cards with QoQ change, asset/liability tables with YoY comparison
@@ -365,7 +372,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_i
 
 ## Known Issues / Blockers
 
-_None yet — update this section as issues arise._
+- **Dead nav links**: `/budget` and `/cashflow` are linked in `Sidebar.tsx` but have no page → they 404. Decision: build both (see `REVIEW_PLAN.md`).
+- **Bad net-worth quarter**: 2025-09-30 shows ~ -$1.05M from blank source cells; distorts net-worth chart axes until source spreadsheet is completed or the quarter is filtered.
+
+See **`REVIEW_PLAN.md`** for the full post-review action checklist (Session 8).
 
 ---
 

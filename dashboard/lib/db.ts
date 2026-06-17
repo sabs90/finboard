@@ -298,6 +298,29 @@ export function getOverviewKpis(month: string): OverviewKpis {
   };
 }
 
+export interface SpendIncome {
+  spendCents: number;  // negative (outflow)
+  incomeCents: number; // positive
+}
+
+/**
+ * Spend and income within a month, restricted to transactions on or before a
+ * given day-of-month. Used for fair month-to-date vs month-to-date comparison.
+ */
+export function getSpendIncomeUpToDay(month: string, maxDay: number): SpendIncome {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT
+      COALESCE(SUM(CASE WHEN amount_cents < 0 THEN amount_cents ELSE 0 END), 0) AS spend,
+      COALESCE(SUM(CASE WHEN amount_cents > 0 THEN amount_cents ELSE 0 END), 0) AS income
+    FROM transactions
+    WHERE strftime('%Y-%m', transaction_date) = ?
+      AND CAST(strftime('%d', transaction_date) AS INTEGER) <= ?
+      AND is_transfer = 0
+  `).get(month, maxDay) as { spend: number; income: number };
+  return { spendCents: row.spend, incomeCents: row.income };
+}
+
 export function getCategoryBreakdown(month: string): CategoryBreakdownRow[] {
   const db = getDb();
   return db.prepare(`
@@ -843,6 +866,104 @@ export function getHistoricalAccountBalances(): HistoricalBalancePoint[] {
     )
     ORDER BY sort_key, account_name, balance_date
   `).all() as HistoricalBalancePoint[];
+}
+
+// ── Cash Flow ───────────────────────────────────────────────────────────────
+
+export interface CashflowRow {
+  month: string;
+  income_cents: number;
+  expense_cents: number;
+  net_cents: number;
+}
+
+export function getCashflow(months: number): CashflowRow[] {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT
+      strftime('%Y-%m', t.transaction_date) AS month,
+      COALESCE(SUM(CASE WHEN t.amount_cents > 0 THEN t.amount_cents ELSE 0 END), 0) AS income_cents,
+      COALESCE(SUM(CASE WHEN t.amount_cents < 0 THEN -t.amount_cents ELSE 0 END), 0) AS expense_cents
+    FROM transactions t
+    WHERE t.is_transfer = 0
+      AND t.transaction_date >= date('now', '-' || ? || ' months', 'start of month')
+    GROUP BY strftime('%Y-%m', t.transaction_date)
+    ORDER BY month
+  `).all(months) as { month: string; income_cents: number; expense_cents: number }[];
+  return rows.map((r) => ({ ...r, net_cents: r.income_cents - r.expense_cents }));
+}
+
+// ── Budgets ─────────────────────────────────────────────────────────────────
+
+export interface BudgetRow {
+  category_id: number;
+  category: string;
+  parent_id: number;
+  parent_category: string;
+  colour: string;
+  budget_cents: number;
+  spent_cents: number;
+  avg6_cents: number;
+}
+
+/**
+ * Every expense child category with its budget (0 if unset), actual spend for
+ * the given month, and average monthly spend over the 6 months preceding the
+ * selected month (a baseline for setting budgets). Income and Transfers parents
+ * are excluded — budgets only apply to expenses.
+ */
+export function getBudgetRows(month: string): BudgetRow[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      c.id AS category_id,
+      c.name AS category,
+      c.parent_id,
+      pc.name AS parent_category,
+      COALESCE(pc.colour, c.colour, '#9CA3AF') AS colour,
+      COALESCE(b.amount_cents, 0) AS budget_cents,
+      COALESCE(spend.spent_cents, 0) AS spent_cents,
+      COALESCE(avg6.avg6_cents, 0) AS avg6_cents
+    FROM categories c
+    JOIN categories pc ON c.parent_id = pc.id
+    LEFT JOIN budgets b ON b.category_id = c.id AND b.month = ?
+    LEFT JOIN (
+      SELECT category_id, ABS(SUM(amount_cents)) AS spent_cents
+      FROM transactions
+      WHERE strftime('%Y-%m', transaction_date) = ?
+        AND amount_cents < 0
+        AND is_transfer = 0
+      GROUP BY category_id
+    ) spend ON spend.category_id = c.id
+    LEFT JOIN (
+      SELECT category_id, ABS(SUM(amount_cents)) / 6 AS avg6_cents
+      FROM transactions
+      WHERE transaction_date >= date(? || '-01', '-6 months')
+        AND transaction_date < date(? || '-01')
+        AND amount_cents < 0
+        AND is_transfer = 0
+      GROUP BY category_id
+    ) avg6 ON avg6.category_id = c.id
+    WHERE c.parent_id IS NOT NULL
+      AND pc.name NOT IN ('Income', 'Transfers')
+    ORDER BY pc.sort_order, pc.name, c.sort_order, c.name
+  `).all(month, month, month, month) as BudgetRow[];
+}
+
+/** Upsert a budget amount for a category in a month. 0 deletes the row. */
+export function upsertBudget(categoryId: number, month: string, amountCents: number): void {
+  const db = getDb();
+  if (amountCents <= 0) {
+    db.prepare(`DELETE FROM budgets WHERE category_id = ? AND month = ?`).run(categoryId, month);
+    return;
+  }
+  db.prepare(`
+    INSERT INTO budgets (category_id, month, amount_cents, created_at, updated_at)
+    VALUES (?, ?, ?, unixepoch(), unixepoch())
+    ON CONFLICT(category_id, month) DO UPDATE SET
+      amount_cents = excluded.amount_cents,
+      updated_at = unixepoch()
+  `).run(categoryId, month, amountCents);
 }
 
 export function getPivotData(months: number): PivotRow[] {

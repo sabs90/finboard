@@ -49,3 +49,6 @@ yarn-error.log*
 
 # ── Docker ───────────────────────────────────────────────────────────────────
 docker/secrets/
+
+# TypeScript incremental build info
+*.tsbuildinfo

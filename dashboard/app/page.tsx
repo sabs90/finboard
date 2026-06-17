@@ -1,5 +1,5 @@
-import { getOverviewKpis, getCategoryBreakdown, getMonthlyTotals, getRecentTransactions, getLatestNetWorthSnapshot } from '@/lib/db';
-import { getCurrentMonth, formatCurrency, formatDollars, formatDate, formatMonth } from '@/lib/formatters';
+import { getOverviewKpis, getCategoryBreakdown, getMonthlyTotals, getRecentTransactions, getLatestNetWorthSnapshot, getSpendIncomeUpToDay } from '@/lib/db';
+import { getCurrentMonth, formatCurrency, formatDollars, formatDate, formatMonth, prevMonth } from '@/lib/formatters';
 import Link from 'next/link';
 import { KpiCard } from '@/components/ui/KpiCard';
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -40,6 +40,22 @@ export default function OverviewPage() {
   const savingsRate = kpis.totalIncomeCents > 0
     ? Math.round((savings / kpis.totalIncomeCents) * 100)
     : 0;
+
+  // ── Month-to-date comparison vs the same point last month ──────────────────
+  const currentDay = new Date().getDate();
+  const lastMTD = getSpendIncomeUpToDay(prevMonth(month), currentDay);
+
+  const thisSpend = Math.abs(kpis.totalSpendCents);
+  const lastSpend = Math.abs(lastMTD.spendCents);
+  const spendPct = lastSpend > 0 ? Math.round(((thisSpend - lastSpend) / lastSpend) * 100) : null;
+
+  const thisIncome = kpis.totalIncomeCents;
+  const lastIncome = lastMTD.incomeCents;
+  const incomePct = lastIncome > 0 ? Math.round(((thisIncome - lastIncome) / lastIncome) * 100) : null;
+
+  const lastSavings = lastMTD.incomeCents + lastMTD.spendCents;
+  const lastSavingsRate = lastIncome > 0 ? Math.round((lastSavings / lastIncome) * 100) : null;
+  const savingsRateDelta = lastSavingsRate !== null ? savingsRate - lastSavingsRate : null;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -84,16 +100,33 @@ export default function OverviewPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KpiCard
           label="Spent this month"
-          value={formatCurrency(Math.abs(kpis.totalSpendCents))}
+          value={formatCurrency(thisSpend)}
+          subtitle="Month to date"
+          trend={spendPct !== null ? {
+            value: `${Math.abs(spendPct)}% vs last month`,
+            positive: thisSpend <= lastSpend,
+            direction: thisSpend >= lastSpend ? 'up' : 'down',
+          } : undefined}
         />
         <KpiCard
           label="Income"
-          value={formatCurrency(kpis.totalIncomeCents)}
+          value={formatCurrency(thisIncome)}
+          subtitle="Month to date"
+          trend={incomePct !== null ? {
+            value: `${Math.abs(incomePct)}% vs last month`,
+            positive: thisIncome >= lastIncome,
+            direction: thisIncome >= lastIncome ? 'up' : 'down',
+          } : undefined}
         />
         <KpiCard
           label="Savings rate"
           value={`${savingsRate}%`}
           subtitle={formatCurrency(savings)}
+          trend={savingsRateDelta !== null ? {
+            value: `${savingsRateDelta >= 0 ? '+' : ''}${savingsRateDelta}pp vs last month`,
+            positive: savingsRateDelta >= 0,
+            direction: savingsRateDelta >= 0 ? 'up' : 'down',
+          } : undefined}
         />
         <KpiCard
           label="Top category"

@@ -1,9 +1,11 @@
 import { getNetWorthHistory, getLatestNetWorthSnapshot } from '@/lib/db';
 import { formatDollars } from '@/lib/formatters';
+import Link from 'next/link';
 import { KpiCard } from '@/components/ui/KpiCard';
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
 import { NetWorthStackedChart } from '@/components/charts/NetWorthStackedChart';
 import type { NetWorthStackedPoint } from '@/components/charts/NetWorthStackedChart';
+import { NetWorthHistoryChart } from '@/components/charts/NetWorthHistoryChart';
 
 export default function NetWorthPage() {
   const snap = getLatestNetWorthSnapshot();
@@ -24,6 +26,13 @@ export default function NetWorthPage() {
     cash: Math.max(0, h.cash_cents),
     other_assets: Math.max(0, h.other_assets_cents),
     net_worth: h.net_worth_cents,
+  }));
+
+  const lineData = history.map((h) => ({
+    date: h.snapshot_date,
+    net_worth: h.net_worth_cents,
+    total_assets: h.total_assets_cents,
+    mortgage: h.mortgage_cents,
   }));
 
   // Quarter-on-quarter change in net worth
@@ -69,7 +78,29 @@ export default function NetWorthPage() {
         />
       </div>
 
-      {/* ── Stacked area chart ────────────────────────────────────────── */}
+      {/* ── Change summary ────────────────────────────────────────────── */}
+      {(qoqChange !== null || yoyChange !== null) && (
+        <div className="grid grid-cols-2 gap-4">
+          {qoqChange !== null && (
+            <div className="bg-slate-900 rounded-2xl border border-slate-800 px-6 py-4">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">vs last quarter</p>
+              <p className={`mt-1 text-xl font-bold tabular-nums ${qoqChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {qoqChange >= 0 ? '+' : ''}{formatDollars(qoqChange)}
+              </p>
+            </div>
+          )}
+          {yoyChange !== null && (
+            <div className="bg-slate-900 rounded-2xl border border-slate-800 px-6 py-4">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">vs 1 year ago</p>
+              <p className={`mt-1 text-xl font-bold tabular-nums ${yoyChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {yoyChange >= 0 ? '+' : ''}{formatDollars(yoyChange)}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Wealth composition (stacked area) ─────────────────────────── */}
       <Card>
         <CardHeader>
           <CardTitle>Wealth Composition — Quarterly</CardTitle>
@@ -79,101 +110,29 @@ export default function NetWorthPage() {
         </div>
       </Card>
 
-      {/* ── Snapshot breakdown table ──────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader><CardTitle>Assets</CardTitle></CardHeader>
-          <div className="px-6 pb-6">
-            <table className="w-full text-sm">
-              <tbody className="divide-y divide-slate-800">
-                {[
-                  { label: 'Property',    cents: snap.property_value_cents,  color: '#8B5CF6' },
-                  { label: 'Investments', cents: snap.investment_cents,       color: '#10B981' },
-                  { label: 'Cash',        cents: snap.cash_cents,             color: '#3B82F6' },
-                  { label: 'Other',       cents: snap.other_assets_cents,     color: '#F59E0B' },
-                ].map(({ label, cents, color }) => (
-                  <tr key={label}>
-                    <td className="py-2.5 flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-                      <span className="text-slate-300">{label}</span>
-                    </td>
-                    <td className="py-2.5 text-right tabular-nums text-slate-100">
-                      {formatDollars(cents)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t border-slate-700">
-                  <td className="pt-3 font-semibold text-slate-300">Total Assets</td>
-                  <td className="pt-3 text-right tabular-nums font-semibold text-slate-100">
-                    {formatDollars(snap.total_assets_cents)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </Card>
+      {/* ── Net worth vs assets vs debt (line) ────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Net Worth History</CardTitle>
+        </CardHeader>
+        <div className="px-6 pb-6">
+          <NetWorthHistoryChart data={lineData} />
+        </div>
+      </Card>
 
-        <Card>
-          <CardHeader><CardTitle>Liabilities</CardTitle></CardHeader>
-          <div className="px-6 pb-6">
-            <table className="w-full text-sm">
-              <tbody className="divide-y divide-slate-800">
-                {[
-                  { label: 'Mortgage',          cents: snap.mortgage_cents,           color: '#EF4444' },
-                  { label: 'Other Liabilities',  cents: snap.other_liabilities_cents,  color: '#F97316' },
-                ].map(({ label, cents, color }) => (
-                  <tr key={label}>
-                    <td className="py-2.5 flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-                      <span className="text-slate-300">{label}</span>
-                    </td>
-                    <td className="py-2.5 text-right tabular-nums text-slate-100">
-                      {formatDollars(cents)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t border-slate-700">
-                  <td className="pt-3 font-semibold text-slate-300">Total Liabilities</td>
-                  <td className="pt-3 text-right tabular-nums font-semibold text-rose-400">
-                    {formatDollars(snap.total_liabilities_cents)}
-                  </td>
-                </tr>
-                <tr className="border-t border-slate-600">
-                  <td className="pt-3 font-bold text-slate-100">Net Worth</td>
-                  <td className="pt-3 text-right tabular-nums font-bold text-emerald-400">
-                    {formatDollars(snap.net_worth_cents)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-
-            {(qoqChange !== null || yoyChange !== null) && (
-              <div className="mt-4 pt-4 border-t border-slate-800 space-y-2">
-                {qoqChange !== null && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-400">vs last quarter</span>
-                    <span className={`font-medium tabular-nums ${qoqChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {qoqChange >= 0 ? '+' : ''}{formatDollars(qoqChange)}
-                    </span>
-                  </div>
-                )}
-                {yoyChange !== null && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-400">vs 1 year ago</span>
-                    <span className={`font-medium tabular-nums ${yoyChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {yoyChange >= 0 ? '+' : ''}{formatDollars(yoyChange)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
+      {/* ── Link to detailed positions ────────────────────────────────── */}
+      <Link
+        href="/balance-sheet"
+        className="block bg-slate-900 rounded-2xl border border-slate-800 px-6 py-4 hover:border-slate-700 transition-colors"
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-slate-200">View the Balance Sheet →</p>
+            <p className="text-xs text-slate-500 mt-0.5">Detailed account positions, debt facilities, and quarterly history</p>
           </div>
-        </Card>
-      </div>
+          <span className="text-slate-500 text-lg">→</span>
+        </div>
+      </Link>
     </div>
   );
 }

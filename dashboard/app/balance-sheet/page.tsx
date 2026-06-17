@@ -11,8 +11,8 @@ import { formatDollars } from '@/lib/formatters';
 import { KpiCard } from '@/components/ui/KpiCard';
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
 import { SpendingDonut } from '@/components/charts/SpendingDonut';
-import { NetWorthHistoryChart } from '@/components/charts/NetWorthHistoryChart';
 import { HistoricalBalanceTable } from '@/components/balance-sheet/HistoricalBalanceTable';
+import Link from 'next/link';
 
 function pct(rate: number | null): string {
   if (rate === null || rate === undefined) return '—';
@@ -72,23 +72,20 @@ export default function BalanceSheetPage() {
   }
   const weightedAvgRate = ratedBalance > 0 ? ratedWeightedRate / ratedBalance : null;
 
-  // ── Net worth history chart data ──────────────────────────────────────────
-  const chartData = history.map((h) => ({
-    date: h.snapshot_date,
-    net_worth: h.net_worth_cents,
-    total_assets: h.total_assets_cents,
-    mortgage: h.mortgage_cents,
-  }));
-
   const asOf = snap.snapshot_date;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-100">Balance Sheet</h1>
-        <span className="text-sm text-slate-500">
-          As at {asOf.split('-').reverse().join('/')}
-        </span>
+        <div className="flex items-center gap-4">
+          <Link href="/networth" className="text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors">
+            View trends →
+          </Link>
+          <span className="text-sm text-slate-500">
+            As at {asOf.split('-').reverse().join('/')}
+          </span>
+        </div>
       </div>
 
       {/* ── KPI row ─────────────────────────────────────────────────────── */}
@@ -320,16 +317,6 @@ export default function BalanceSheetPage() {
               </tr>
             </tfoot>
           </table>
-        </div>
-      </Card>
-
-      {/* ── Net Worth History ─────────────────────────────────────────── */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Net Worth History</CardTitle>
-        </CardHeader>
-        <div className="px-6 pb-6">
-          <NetWorthHistoryChart data={chartData} />
         </div>
       </Card>
 
