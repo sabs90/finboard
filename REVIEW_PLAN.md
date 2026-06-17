@@ -80,22 +80,21 @@ The two pages were ~80% duplicated. Each now has a distinct job (not merged).
 
 ---
 
-## 5. 🟡 Data quality — bad net-worth quarter
+## 5. 🟡 Data quality — bad net-worth quarter ✅ RESOLVED (verified Session 8)
 
-- [ ] The 2025-09-30 quarter shows ~ -$1.05M net worth from blank source cells (see PROGRESS Session 6).
-      Either complete the source spreadsheet and re-run `ingest_balance_sheet.py`, or filter the
-      incomplete quarter so it doesn't distort chart axes.
-- [ ] Acceptance: net-worth charts have a sane y-axis with no phantom dip
+- [x] No longer an issue: 2025-09-30 now reads +$1.02M (between Q2 $999k and Q4 $1.05M); no negative
+      net-worth quarters remain. Source spreadsheet was completed and ingest re-run. No code change needed.
 
 ---
 
-## 6. 🟡 Mobile-responsive layout
+## 6. 🟡 Mobile-responsive layout ✅ DONE (Session 8)
 
-Access is over Tailscale incl. phone (README). Sidebar is a fixed `w-56` with no collapse.
-
-- [ ] Collapsible sidebar / hamburger on small screens (`Sidebar.tsx`, `layout.tsx`)
-- [ ] Verify tables (transactions, account history, debt summary) scroll/reflow on narrow widths
-- [ ] Acceptance: usable on a phone-width viewport
+- [x] Sidebar is now a slide-in drawer under `lg` with a hamburger top bar; static on desktop.
+      Backdrop tap + route change close it. (`Sidebar.tsx`)
+- [x] `layout.tsx` main padding made responsive (`p-4 sm:p-6 lg:p-8`) with top offset for the mobile bar.
+- [x] Wide tables scroll horizontally: account history + debt summary already wrapped; added
+      `overflow-x-auto` + `min-w` to the budget editor table.
+- [x] Verified: markup renders, all routes 200, typecheck clean. (Eyeball at phone width to confirm feel.)
 
 ---
 

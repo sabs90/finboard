@@ -372,8 +372,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_i
 
 ## Known Issues / Blockers
 
-- **Dead nav links**: `/budget` and `/cashflow` are linked in `Sidebar.tsx` but have no page → they 404. Decision: build both (see `REVIEW_PLAN.md`).
-- **Bad net-worth quarter**: 2025-09-30 shows ~ -$1.05M from blank source cells; distorts net-worth chart axes until source spreadsheet is completed or the quarter is filtered.
+- ~~**Dead nav links**: `/budget` and `/cashflow` 404~~ — resolved Session 8 (both pages built).
+- ~~**Bad net-worth quarter**: 2025-09-30 showed ~ -$1.05M~~ — resolved; now +$1.02M after source spreadsheet was completed and ingest re-run.
 
 See **`REVIEW_PLAN.md`** for the full post-review action checklist (Session 8).
 

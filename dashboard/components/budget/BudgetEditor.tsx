@@ -150,7 +150,8 @@ export function BudgetEditor({ rows, month }: { rows: BudgetRow[]; month: string
               {formatCurrency(g.spentTotal)} / {g.budgetTotal > 0 ? formatCurrency(g.budgetTotal) : '—'}
             </span>
           </div>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="text-left text-slate-500 border-b border-slate-800/50">
                 <th className="px-6 py-2 font-medium">Category</th>
@@ -167,6 +168,7 @@ export function BudgetEditor({ rows, month }: { rows: BudgetRow[]; month: string
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       ))}
     </div>
