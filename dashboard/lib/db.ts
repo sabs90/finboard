@@ -776,6 +776,75 @@ export function getLatestAssetBreakdown(): AssetBreakdownRow[] {
   `).all() as AssetBreakdownRow[];
 }
 
+export interface HistoricalBalancePoint {
+  account_name: string;
+  category: string;
+  sort_key: number;
+  balance_date: string;
+  balance_cents: number;
+}
+
+export function getHistoricalAccountBalances(): HistoricalBalancePoint[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT account_name, category, sort_key, balance_date, balance_cents FROM (
+
+      SELECT
+        a.name AS account_name,
+        CASE a.account_type
+          WHEN 'savings'     THEN 'Cash'
+          WHEN 'transaction' THEN 'Cash'
+          WHEN 'asset'       THEN 'Other'
+          WHEN 'liability'   THEN 'Other Liabilities'
+          ELSE CASE
+            WHEN a.institution IN ('CMC Markets', 'IG', 'Moelis', 'Stockland') THEN 'Investments'
+            ELSE 'Other'
+          END
+        END AS category,
+        CASE a.account_type
+          WHEN 'savings'     THEN 1
+          WHEN 'transaction' THEN 1
+          WHEN 'asset'       THEN 3
+          WHEN 'liability'   THEN 5
+          ELSE CASE
+            WHEN a.institution IN ('CMC Markets', 'IG', 'Moelis', 'Stockland') THEN 2
+            ELSE 3
+          END
+        END AS sort_key,
+        ab.balance_date,
+        ab.balance_cents
+      FROM account_balances ab
+      JOIN accounts a ON ab.account_id = a.id
+      WHERE a.source = 'manual'
+        AND a.account_type != 'mortgage'
+
+      UNION ALL
+
+      SELECT
+        a.name AS account_name,
+        'Property' AS category,
+        2 AS sort_key,
+        ast.valuation_date AS balance_date,
+        ast.value_cents AS balance_cents
+      FROM assets ast
+      JOIN accounts a ON ast.account_id = a.id
+
+      UNION ALL
+
+      SELECT
+        a.name AS account_name,
+        'Mortgages' AS category,
+        4 AS sort_key,
+        ls.snapshot_date AS balance_date,
+        ls.outstanding_cents AS balance_cents
+      FROM loan_snapshots ls
+      JOIN accounts a ON ls.account_id = a.id
+
+    )
+    ORDER BY sort_key, account_name, balance_date
+  `).all() as HistoricalBalancePoint[];
+}
+
 export function getPivotData(months: number): PivotRow[] {
   const db = getDb();
   return db.prepare(`

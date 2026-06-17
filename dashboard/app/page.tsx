@@ -1,5 +1,6 @@
-import { getOverviewKpis, getCategoryBreakdown, getMonthlyTotals, getRecentTransactions } from '@/lib/db';
-import { getCurrentMonth, formatCurrency, formatDate, formatMonth } from '@/lib/formatters';
+import { getOverviewKpis, getCategoryBreakdown, getMonthlyTotals, getRecentTransactions, getLatestNetWorthSnapshot } from '@/lib/db';
+import { getCurrentMonth, formatCurrency, formatDollars, formatDate, formatMonth } from '@/lib/formatters';
+import Link from 'next/link';
 import { KpiCard } from '@/components/ui/KpiCard';
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
 import { SpendingDonut } from '@/components/charts/SpendingDonut';
@@ -30,6 +31,7 @@ export default function OverviewPage() {
   const categoryBreakdown = getCategoryBreakdown(month);
   const monthlyTotals = getMonthlyTotals(6);
   const recentTransactions = getRecentTransactions(10);
+  const netWorth = getLatestNetWorthSnapshot();
 
   const donutData = prepareDonutData(categoryBreakdown);
   const barData = monthlyTotals.map((r) => ({ month: r.month, total: r.total_cents }));
@@ -45,6 +47,39 @@ export default function OverviewPage() {
         <h1 className="text-2xl font-bold text-slate-100">Overview</h1>
         <span className="text-sm text-slate-400">{formatMonth(month)}</span>
       </div>
+
+      {/* ── Net Worth hero ──────────────────────────────────────────── */}
+      {netWorth && (
+        <Link href="/networth" className="block">
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 px-6 py-5 hover:border-slate-700 transition-colors">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Net Worth</p>
+                <p className="mt-1 text-4xl font-bold text-slate-100 tabular-nums">
+                  {formatDollars(netWorth.net_worth_cents)}
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  As at {netWorth.snapshot_date.split('-').reverse().join('/')}
+                </p>
+              </div>
+              <div className="text-right space-y-1 mt-1">
+                {[
+                  { label: 'Property equity', cents: netWorth.property_equity_cents },
+                  { label: 'Investments',     cents: netWorth.investment_cents },
+                  { label: 'Cash',            cents: netWorth.cash_cents },
+                ].map(({ label, cents }) => (
+                  <div key={label} className="flex items-center gap-3 justify-end">
+                    <span className="text-xs text-slate-500">{label}</span>
+                    <span className="text-sm tabular-nums text-slate-300 w-24 text-right">
+                      {formatDollars(cents)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Link>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KpiCard

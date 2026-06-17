@@ -5,12 +5,14 @@ import {
   getLatestLoanSnapshots,
   getLatestAssetBreakdown,
   getAssetAccountDetails,
+  getHistoricalAccountBalances,
 } from '@/lib/db';
 import { formatDollars } from '@/lib/formatters';
 import { KpiCard } from '@/components/ui/KpiCard';
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
 import { SpendingDonut } from '@/components/charts/SpendingDonut';
 import { NetWorthHistoryChart } from '@/components/charts/NetWorthHistoryChart';
+import { HistoricalBalanceTable } from '@/components/balance-sheet/HistoricalBalanceTable';
 
 function pct(rate: number | null): string {
   if (rate === null || rate === undefined) return '—';
@@ -26,6 +28,7 @@ function propertyLabel(accountName: string): string {
 export default function BalanceSheetPage() {
   const snap = getLatestNetWorthSnapshot();
   const history = getNetWorthHistory();
+  const historicalPoints = getHistoricalAccountBalances();
   const loans = snap ? getLatestLoanSnapshots(snap.snapshot_date) : [];
   const assetRows = getLatestAssetBreakdown();
   const assetDetails = snap ? getAssetAccountDetails(snap.snapshot_date) : [];
@@ -328,6 +331,14 @@ export default function BalanceSheetPage() {
         <div className="px-6 pb-6">
           <NetWorthHistoryChart data={chartData} />
         </div>
+      </Card>
+
+      {/* ── Historical Balance Table ──────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Account History — Quarterly</CardTitle>
+        </CardHeader>
+        <HistoricalBalanceTable points={historicalPoints} snapshots={history} />
       </Card>
     </div>
   );
