@@ -184,7 +184,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_i
 **Goal**: All views populated with real data. Dashboard usable day-to-day.
 
 #### 4a — Overview (Home)
-- [ ] Net worth figure (current, large)
+- [x] Net worth figure (current, large) — hero card linking to /networth
 - [x] Month-to-date spend KPI card
 - [x] Income KPI card
 - [x] Savings rate this month
@@ -219,9 +219,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_i
 - [ ] Prior month comparison
 
 #### 4e — Net Worth Over Time
-- [ ] Line chart of total net worth
-- [ ] Stacked area breakdown (property equity / investments / cash / liabilities)
-- [ ] At least 3 months of history populated
+- [x] Line chart of total net worth
+- [x] Stacked area breakdown (property equity / investments / cash / other — 30 quarters)
+- [x] KPI cards with QoQ and YoY change
+- [x] Assets + liabilities breakdown tables
 
 #### 4f — Transactions
 - [x] Full transaction list, paginated (30 per page)
@@ -287,6 +288,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_i
 - Ingest pipeline now has 3-tier priority: merchant rules > description keyword rules > Frollo category mapping
 - Final state: 1,911 categorised expenses, 90 money transfers, 157 uncategorised
 - AMP CSV ingest still pending — user to provide sample CSV
+
+### Session 7 — Net Worth page + Overview hero + Balance Sheet history table (2026-06-17)
+- Added net worth hero card to Overview — large figure, equity/invest/cash breakdown, links to /networth
+- Built `/networth` page: stacked area chart (30 quarters), KPI cards with QoQ change, asset/liability tables with YoY comparison
+- Built historical balance table on balance sheet page: all accounts × all quarters, sticky name column, compact M/k format
+- Fixed fmt() 10x magnitude bug (threshold/divisor mismatch in cents conversion)
+- Fixed asset/liability detail rows pinned to snapshot date (not per-account MAX)
+- Ingest carry-forward for uncached formula cells (vehicles, variable mortgage)
+- **Next**: Docker deployment, then Budget vs Actual or Cash Flow
 
 ### Session 6 — Phase 2b/2c/2d: Balance Sheet end-to-end (2026-06-16)
 - Committed AMP ingest work (was done but unstaged)
