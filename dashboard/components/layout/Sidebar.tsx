@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { formatDate } from '@/lib/formatters';
 
 interface NavItem {
   href: string;
@@ -44,7 +45,7 @@ const navSections: NavSection[] = [
   },
 ];
 
-export function Sidebar() {
+export function Sidebar({ dataAsOf }: { dataAsOf?: string | null }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -130,6 +131,12 @@ export function Sidebar() {
             </div>
           ))}
         </nav>
+        {dataAsOf && (
+          <div className="px-6 py-4 border-t border-slate-800/70">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">Data current to</p>
+            <p className="text-xs text-slate-400 mt-0.5">{formatDate(dataAsOf)}</p>
+          </div>
+        )}
       </aside>
     </>
   );

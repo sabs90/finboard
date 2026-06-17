@@ -1,9 +1,12 @@
 import { searchTransactions, getAllCategories, getAccounts } from '@/lib/db';
-import { formatCurrency, formatDate } from '@/lib/formatters';
+import { formatDate } from '@/lib/formatters';
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Amount } from '@/components/ui/Amount';
 import { CategoryPicker } from '@/components/transactions/CategoryPicker';
 import { TransactionFilters } from '@/components/transactions/TransactionFilters';
 import { Pagination } from '@/components/transactions/Pagination';
+import { FlagToggle } from '@/components/transactions/FlagToggle';
+import { NoteInput } from '@/components/transactions/NoteInput';
 
 const PAGE_SIZE = 30;
 
@@ -15,6 +18,8 @@ export default function TransactionsPage({
     account?: string;
     category?: string;
     month?: string;
+    from?: string;
+    to?: string;
     page?: string;
   };
 }) {
@@ -27,6 +32,8 @@ export default function TransactionsPage({
     accountId: isNaN(accountId as number) ? undefined : accountId,
     categoryId: isNaN(categoryId as number) ? undefined : categoryId,
     month: searchParams.month,
+    startDate: searchParams.from,
+    endDate: searchParams.to,
     page,
     pageSize: PAGE_SIZE,
   });
@@ -52,36 +59,42 @@ export default function TransactionsPage({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-800 text-left text-slate-400">
-                  <th className="px-6 py-3 font-medium">Date</th>
-                  <th className="px-6 py-3 font-medium">Description</th>
-                  <th className="px-6 py-3 font-medium">Account</th>
-                  <th className="px-6 py-3 font-medium">Category</th>
+                  <th className="pl-6 pr-2 py-3 font-medium w-8"></th>
+                  <th className="px-4 py-3 font-medium">Date</th>
+                  <th className="px-4 py-3 font-medium">Description</th>
+                  <th className="px-4 py-3 font-medium">Account</th>
+                  <th className="px-4 py-3 font-medium">Category</th>
+                  <th className="px-4 py-3 font-medium">Note</th>
                   <th className="px-6 py-3 font-medium text-right">Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/50">
                 {transactions.map((txn) => (
-                  <tr key={txn.id} className="hover:bg-slate-800/50 transition-colors">
-                    <td className="px-6 py-3 text-slate-400 whitespace-nowrap">
+                  <tr key={txn.id} className={`hover:bg-slate-800/50 transition-colors ${txn.is_flagged ? 'bg-amber-500/5' : ''}`}>
+                    <td className="pl-6 pr-2 py-3">
+                      <FlagToggle transactionId={txn.id} flagged={!!txn.is_flagged} />
+                    </td>
+                    <td className="px-4 py-3 text-slate-400 whitespace-nowrap">
                       {formatDate(txn.transaction_date)}
                     </td>
-                    <td className="px-6 py-3 text-slate-100">
+                    <td className="px-4 py-3 text-slate-100">
                       {txn.merchant || txn.description}
                     </td>
-                    <td className="px-6 py-3 text-slate-500 whitespace-nowrap">
+                    <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
                       {txn.account_name}
                     </td>
-                    <td className="px-6 py-3">
+                    <td className="px-4 py-3">
                       <CategoryPicker
                         transactionId={txn.id}
                         currentCategoryId={txn.category_id}
                         categories={categories}
                       />
                     </td>
-                    <td className={`px-6 py-3 text-right font-medium whitespace-nowrap tabular-nums ${
-                      txn.amount_cents >= 0 ? 'text-emerald-400' : 'text-slate-100'
-                    }`}>
-                      {formatCurrency(txn.amount_cents)}
+                    <td className="px-4 py-3">
+                      <NoteInput transactionId={txn.id} note={txn.notes ?? null} />
+                    </td>
+                    <td className="px-6 py-3 text-right whitespace-nowrap">
+                      <Amount cents={txn.amount_cents} />
                     </td>
                   </tr>
                 ))}

@@ -98,13 +98,18 @@ The two pages were ~80% duplicated. Each now has a distinct job (not merged).
 
 ---
 
-## 7. 🟢 Lower priority / nice-to-haves
+## 7. 🟢 Lower priority / nice-to-haves ✅ DONE (Session 8)
 
-- [ ] Data-freshness badge — show last ingest / "data as at" date somewhere persistent
-- [ ] Single source of truth for category colours — currently split across `tailwind.config.ts`
-      (`category.*`, largely unused), the DB `colour` column, and `chartColors.ts`
-- [ ] Consistent income/expense colour convention (income emerald; expenses currently plain white)
-- [ ] Transactions: custom date-range filter; flag/note on individual transactions (Phase 4f / 5)
+- [x] Data-freshness badge — sidebar footer "Data current to {latest transaction date}"
+      (`getDataFreshness()` → `layout.tsx` → `Sidebar`). Surfaced that data is ~2 weeks behind.
+- [x] Single source of truth for category colours — removed the unused `tailwind.config.ts`
+      `category.*`/`surface.*` tokens; documented DB `colour` (primary) + `chartColors.ts` (fallback).
+- [x] Consistent income/expense colour — new `<Amount>` component (inflow emerald / outflow neutral)
+      applied across all transaction tables (Overview, Transactions, TransactionList).
+- [x] Transactions: custom date-range filter (from/to inputs → `searchTransactions` start/endDate).
+- [x] Transactions: flag toggle + inline note per row (columns already existed in schema; wired
+      `updateTransactionFlag`/`updateTransactionNote` + server actions; flagged rows tinted amber).
+- [x] Verified: date filter 13 vs 3,197; flag/note round-trip in DB; freshness badge renders; typecheck clean.
 
 ---
 

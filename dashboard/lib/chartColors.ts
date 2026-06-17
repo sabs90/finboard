@@ -1,3 +1,6 @@
+// Canonical category-colour fallback. The DB `categories.colour` column is the
+// primary source (joined into queries via COALESCE(pc.colour, c.colour)); this
+// map and the subcategory palette below cover cases where the DB has no colour.
 export const CATEGORY_COLORS: Record<string, string> = {
   'Income': '#22C55E',
   'Housing': '#8B5CF6',

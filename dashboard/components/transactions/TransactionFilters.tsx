@@ -72,6 +72,23 @@ export function TransactionFilters({
           </optgroup>
         ))}
       </select>
+      <div className="flex items-center gap-2">
+        <input
+          type="date"
+          aria-label="From date"
+          value={searchParams.get('from') ?? ''}
+          onChange={(e) => updateParams('from', e.target.value)}
+          className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200"
+        />
+        <span className="text-slate-500 text-sm">to</span>
+        <input
+          type="date"
+          aria-label="To date"
+          value={searchParams.get('to') ?? ''}
+          onChange={(e) => updateParams('to', e.target.value)}
+          className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200"
+        />
+      </div>
     </div>
   );
 }

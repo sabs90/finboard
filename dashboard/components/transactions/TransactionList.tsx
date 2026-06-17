@@ -1,5 +1,6 @@
-import { formatCurrency, formatDate } from '@/lib/formatters';
+import { formatDate } from '@/lib/formatters';
 import { CategoryPicker } from './CategoryPicker';
+import { Amount } from '@/components/ui/Amount';
 import type { TransactionRow, CategoryRow } from '@/lib/db';
 
 export function TransactionList({
@@ -54,8 +55,8 @@ export function TransactionList({
                     categories={categories}
                   />
                 </td>
-                <td className="px-6 py-3 text-right font-medium text-slate-100 whitespace-nowrap tabular-nums">
-                  {formatCurrency(txn.amount_cents)}
+                <td className="px-6 py-3 text-right whitespace-nowrap">
+                  <Amount cents={txn.amount_cents} />
                 </td>
               </tr>
             ))}

@@ -3,6 +3,7 @@ import { getCurrentMonth, formatCurrency, formatDollars, formatDate, formatMonth
 import Link from 'next/link';
 import { KpiCard } from '@/components/ui/KpiCard';
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Amount } from '@/components/ui/Amount';
 import { SpendingDonut } from '@/components/charts/SpendingDonut';
 import { MonthlyBarChart } from '@/components/charts/MonthlyBarChart';
 import { getCategoryColor } from '@/lib/chartColors';
@@ -202,10 +203,8 @@ export default function OverviewPage() {
                         <span className="text-xs text-slate-500">Uncategorised</span>
                       )}
                     </td>
-                    <td className={`px-6 py-3 text-right font-medium whitespace-nowrap tabular-nums ${
-                      txn.amount_cents >= 0 ? 'text-emerald-400' : 'text-slate-100'
-                    }`}>
-                      {formatCurrency(txn.amount_cents)}
+                    <td className="px-6 py-3 text-right whitespace-nowrap">
+                      <Amount cents={txn.amount_cents} />
                     </td>
                   </tr>
                 ))}

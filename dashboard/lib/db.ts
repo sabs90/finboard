@@ -33,6 +33,8 @@ export interface TransactionRow {
   category: string | null;
   parent_category: string | null;
   account_name: string;
+  is_flagged?: number;
+  notes?: string | null;
 }
 
 export interface CategoryRow {
@@ -139,6 +141,8 @@ export interface TransactionSearchParams {
   accountId?: number;
   categoryId?: number;
   month?: string;
+  startDate?: string;
+  endDate?: string;
   page: number;
   pageSize: number;
 }
@@ -399,6 +403,16 @@ export function searchTransactions(params: TransactionSearchParams): Transaction
     values.push(params.categoryId, params.categoryId);
   }
 
+  if (params.startDate) {
+    conditions.push('t.transaction_date >= ?');
+    values.push(params.startDate);
+  }
+
+  if (params.endDate) {
+    conditions.push('t.transaction_date <= ?');
+    values.push(params.endDate);
+  }
+
   if (params.query) {
     conditions.push("(t.description LIKE '%' || ? || '%' OR t.merchant LIKE '%' || ? || '%')");
     values.push(params.query, params.query);
@@ -425,7 +439,9 @@ export function searchTransactions(params: TransactionSearchParams): Transaction
       t.category_id,
       c.name AS category,
       pc.name AS parent_category,
-      a.name AS account_name
+      a.name AS account_name,
+      t.is_flagged,
+      t.notes
     FROM transactions t
     LEFT JOIN categories c ON t.category_id = c.id
     LEFT JOIN categories pc ON c.parent_id = pc.id
@@ -436,6 +452,34 @@ export function searchTransactions(params: TransactionSearchParams): Transaction
   `).all(...values, params.pageSize, offset) as TransactionRow[];
 
   return { transactions, total: countRow.cnt };
+}
+
+export interface DataFreshness {
+  latestTransaction: string | null;
+  transactionCount: number;
+}
+
+export function getDataFreshness(): DataFreshness {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT MAX(transaction_date) AS latest, COUNT(*) AS cnt FROM transactions
+  `).get() as { latest: string | null; cnt: number };
+  return { latestTransaction: row.latest, transactionCount: row.cnt };
+}
+
+export function updateTransactionFlag(transactionId: number, flagged: boolean): void {
+  const db = getDb();
+  db.prepare(`
+    UPDATE transactions SET is_flagged = ?, updated_at = unixepoch() WHERE id = ?
+  `).run(flagged ? 1 : 0, transactionId);
+}
+
+export function updateTransactionNote(transactionId: number, note: string): void {
+  const db = getDb();
+  const trimmed = note.trim();
+  db.prepare(`
+    UPDATE transactions SET notes = ?, updated_at = unixepoch() WHERE id = ?
+  `).run(trimmed.length > 0 ? trimmed : null, transactionId);
 }
 
 export function getAccounts(): AccountRow[] {

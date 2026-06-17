@@ -229,8 +229,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_i
 - [x] Filter by account, category
 - [x] Search by description/merchant
 - [x] Inline category re-assignment
-- [ ] Filter by date range (month filter exists, custom range not yet)
-- [ ] Flag / note on individual transactions
+- [x] Filter by date range (custom from/to inputs — Session 8)
+- [x] Flag / note on individual transactions (flag toggle + inline note — Session 8)
 
 **Phase 4 complete**: [ ]
 
@@ -239,8 +239,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_i
 ### Phase 5 — Polish + Ongoing Use
 **Goal**: Stable, low-maintenance system that's a pleasure to use daily.
 
-- [ ] Mobile-responsive layout (for phone access over Tailscale)
-- [ ] Budget amounts editable from the UI (not just the database directly)
+- [x] Mobile-responsive layout (sidebar drawer + responsive padding — Session 8)
+- [x] Budget amounts editable from the UI (child-level inline editor — Session 8)
 - [ ] Category re-assignment UI saves back to SQLite
 - [ ] Error states and loading states on all views
 - [ ] Ingest script sends a summary notification (e.g. email or Synology notification) after each run
