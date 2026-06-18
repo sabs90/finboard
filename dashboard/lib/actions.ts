@@ -9,7 +9,10 @@ import {
   createCategoryRule,
   deleteCategoryRule,
   countRuleMatches,
+  applyCategorisations,
   type RuleType,
+  type CategorisationEdit,
+  type CategorisationSummary,
 } from '@/lib/db';
 
 export async function reassignCategory(transactionId: number, categoryId: number): Promise<void> {
@@ -52,4 +55,13 @@ export async function addCategoryRule(
 export async function removeCategoryRule(id: number): Promise<void> {
   deleteCategoryRule(id);
   revalidatePath('/rules');
+}
+
+export async function applyBulkCategorisation(edits: CategorisationEdit[]): Promise<CategorisationSummary> {
+  const summary = applyCategorisations(edits);
+  revalidatePath('/categorise');
+  revalidatePath('/transactions');
+  revalidatePath('/spending');
+  revalidatePath('/rules');
+  return summary;
 }

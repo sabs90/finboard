@@ -98,6 +98,11 @@ Current top-level categories:
 
 Frollo category names do not map 1:1 to our categories. The mapping is in `config/categories.json`. When Frollo introduces a new category name not in the mapping, it falls to `Uncategorised` and gets logged as a warning.
 
+**Auto-categorisation rules now live in SQLite, not JSON.** The `category_rules` table is the single source of truth for merchant (exact) and description (keyword substring) rules — it replaced `config/merchant_rules.json` and `config/description_rules.json` (kept only as backup; migrated via `scripts/migrate_rules_to_db.py`). Ingest reads rules from the table; the dashboard manages them. Resolution priority is unchanged: merchant rule > description keyword rule > Frollo category map. Three dashboard pages under the sidebar "Manage" section maintain this:
+- **`/import`** — upload a Frollo/AMP CSV; a server action runs the Python ingest and streams the log.
+- **`/categorise`** — bulk grid to categorise transactions; a keyword turns a row into a rule applied DB-wide, no keyword is a one-off.
+- **`/rules`** — create/list/delete rules directly; creating one applies it to all matching transactions live.
+
 ---
 
 ## Session Workflow
@@ -154,8 +159,11 @@ Always test ingest scripts with:
 # Initialise database from scratch
 python scripts/db_init.py
 
-# Run Frollo ingest manually
+# Run Frollo ingest manually (also reachable from the dashboard /import page)
 python scripts/ingest_frollo.py
+
+# Migrate legacy JSON category rules into the category_rules table (one-off; idempotent)
+python scripts/migrate_rules_to_db.py
 
 # Sync Sharesight
 python scripts/sync_sharesight.py

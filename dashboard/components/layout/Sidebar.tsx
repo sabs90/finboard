@@ -47,6 +47,7 @@ const navSections: NavSection[] = [
     heading: 'Manage',
     items: [
       { href: '/import', label: 'Import Data' },
+      { href: '/categorise', label: 'Bulk Categorise' },
       { href: '/rules', label: 'Category Rules' },
     ],
   },

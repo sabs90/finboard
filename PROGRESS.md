@@ -300,7 +300,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_i
     transactions + persisted), live match-count preview, list/delete. One-off edits stay inline.
   - **Stage 3** — `/import` page: upload Frollo/AMP CSV → server action saves it + runs the Python
     ingest via `spawn` (no shell) → streams the log. Dedupes; safe to re-run.
-- Sidebar gained a "Manage" section (Import Data, Category Rules).
+- **Bulk Categorise** (`/categorise`): spreadsheet-style grid (date · full description · merchant ·
+  amount · current category · new parent · new child · keyword). Scope dropdown filters by
+  Uncategorised / Money Transfers / All / any parent or child category; search box too. New
+  parent/child are cascading dropdowns of existing categories. One "Apply N changes" commits the
+  whole batch in a single transaction: each row is a one-off update, and rows with a keyword also
+  create a description rule applied across all matching transactions. Reuses `category_rules`.
+- Sidebar "Manage" section: Import Data, Bulk Categorise, Category Rules.
 - **Deferred/notes**: app currently runs Python + dashboard on the same host (no Dockerfile yet);
   the import action assumes `python3` + scripts are reachable — revisit when Dockerising.
 

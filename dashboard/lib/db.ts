@@ -454,6 +454,138 @@ export function searchTransactions(params: TransactionSearchParams): Transaction
   return { transactions, total: countRow.cnt };
 }
 
+// ── Bulk categorisation grid ──────────────────────────────────────────────────
+
+/**
+ * Candidate transactions for the bulk-categorise grid.
+ * scope: 'uncategorised' | 'transfers' | 'all' | 'cat:<categoryId>'
+ */
+export function getCategorisationCandidates(opts: {
+  scope: string;
+  query?: string;
+  limit: number;
+}): TransactionRow[] {
+  const db = getDb();
+  const conditions: string[] = [];
+  const values: (string | number)[] = [];
+
+  if (opts.scope === 'uncategorised') {
+    conditions.push("t.is_transfer = 0 AND (c.name = 'Uncategorised' OR pc.name = 'Uncategorised' OR t.category_id IS NULL)");
+  } else if (opts.scope === 'transfers') {
+    conditions.push('t.is_transfer = 1');
+  } else if (opts.scope.startsWith('cat:')) {
+    const id = parseInt(opts.scope.slice(4), 10);
+    if (!isNaN(id)) {
+      conditions.push('(t.category_id = ? OR c.parent_id = ?)');
+      values.push(id, id);
+    }
+  }
+  // 'all' adds no scope condition.
+
+  if (opts.query) {
+    conditions.push("(t.description LIKE '%' || ? || '%' OR t.merchant LIKE '%' || ? || '%')");
+    values.push(opts.query, opts.query);
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  return db.prepare(`
+    SELECT
+      t.id, t.transaction_date, t.amount_cents, t.description, t.merchant,
+      t.category_id, c.name AS category, pc.name AS parent_category, a.name AS account_name
+    FROM transactions t
+    LEFT JOIN categories c ON t.category_id = c.id
+    LEFT JOIN categories pc ON c.parent_id = pc.id
+    JOIN accounts a ON t.account_id = a.id
+    ${where}
+    ORDER BY t.transaction_date DESC, t.id DESC
+    LIMIT ?
+  `).all(...values, opts.limit) as TransactionRow[];
+}
+
+export interface CategoryTreeNode {
+  id: number;
+  name: string;
+  children: { id: number; name: string }[];
+}
+
+/** Full category tree (parents with their children) for dropdowns. */
+export function getCategoryTree(): CategoryTreeNode[] {
+  const db = getDb();
+  const parents = db.prepare(
+    `SELECT id, name FROM categories WHERE parent_id IS NULL ORDER BY sort_order, name`
+  ).all() as { id: number; name: string }[];
+  const children = db.prepare(
+    `SELECT id, name, parent_id FROM categories WHERE parent_id IS NOT NULL ORDER BY sort_order, name`
+  ).all() as { id: number; name: string; parent_id: number }[];
+  return parents.map((p) => ({
+    id: p.id,
+    name: p.name,
+    children: children.filter((c) => c.parent_id === p.id).map((c) => ({ id: c.id, name: c.name })),
+  }));
+}
+
+export interface CategorisationEdit {
+  transactionId: number;
+  categoryId: number;   // target category (a child, or a parent for parent-level)
+  keyword: string;
+}
+
+export interface CategorisationSummary {
+  transactionsUpdated: number;
+  rulesCreated: number;
+  additionalMatched: number;
+}
+
+/**
+ * Apply a batch of grid edits in one transaction:
+ *  - always categorises the specific transaction (one-off)
+ *  - if a keyword is given, also creates a description rule and applies it to
+ *    every matching transaction (incl. future imports)
+ */
+export function applyCategorisations(edits: CategorisationEdit[]): CategorisationSummary {
+  const db = getDb();
+  const run = db.transaction(() => {
+    const summary: CategorisationSummary = { transactionsUpdated: 0, rulesCreated: 0, additionalMatched: 0 };
+
+    for (const e of edits) {
+      const cat = db.prepare(`
+        SELECT c.id, c.parent_id, c.name, pc.name AS parent_name
+        FROM categories c LEFT JOIN categories pc ON c.parent_id = pc.id
+        WHERE c.id = ?
+      `).get(e.categoryId) as { id: number; parent_id: number | null; name: string; parent_name: string | null } | undefined;
+      if (!cat) continue;
+
+      const isTransfer = cat.name === 'Money Transfers' && cat.parent_name === 'Transfers' ? 1 : 0;
+      const parentCategoryId = cat.parent_id;
+
+      db.prepare(
+        `UPDATE transactions SET category_id = ?, parent_category_id = ?, is_transfer = ?, updated_at = unixepoch() WHERE id = ?`
+      ).run(cat.id, parentCategoryId, isTransfer, e.transactionId);
+      summary.transactionsUpdated += 1;
+
+      const keyword = e.keyword.trim().toLowerCase();
+      if (keyword) {
+        db.prepare(`
+          INSERT INTO category_rules (rule_type, pattern, category_id, is_transfer, source, created_at, updated_at)
+          VALUES ('description', ?, ?, ?, 'manual', unixepoch(), unixepoch())
+          ON CONFLICT(rule_type, pattern) DO UPDATE SET
+            category_id = excluded.category_id, is_transfer = excluded.is_transfer, updated_at = unixepoch()
+        `).run(keyword, cat.id, isTransfer);
+        summary.rulesCreated += 1;
+
+        const changes = db.prepare(
+          `UPDATE transactions SET category_id = ?, parent_category_id = ?, is_transfer = ?, updated_at = unixepoch()
+           WHERE LOWER(description) LIKE '%' || ? || '%'`
+        ).run(cat.id, parentCategoryId, isTransfer, keyword).changes;
+        summary.additionalMatched += changes;
+      }
+    }
+    return summary;
+  });
+  return run();
+}
+
 // ── Category rules ────────────────────────────────────────────────────────────
 
 export type RuleType = 'merchant' | 'description';
