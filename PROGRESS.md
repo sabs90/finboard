@@ -1,6 +1,6 @@
 # PROGRESS.md — Finboard Build Tracker
 
-Last updated: 2026-06-16 (Session 6)
+Last updated: 2026-06-19 (Session 13)
 
 ---
 
@@ -255,6 +255,25 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_i
 ---
 
 ## Session Log
+
+### Session 13 — R2.7 backlog review + planning (2026-06-19)
+No code this session — shipped Round 2 (Sessions 11–12) is committed + pushed (`6c189bb`).
+Reviewed the R2.7 "larger features" backlog and agreed a recommended order:
+1. **R2.1 first** (the last open 🔴 — CC-payment correctness fix). Card repayments are still
+   counted as spending, so the **savings rate is overstated today**. It's a prerequisite for any
+   forecast/FIRE work, which builds on the savings rate. Quick: backfill `is_transfer = 1` on
+   `Credit Card Payments` + a durable rule (see R2.1 in REVIEW_PLAN.md).
+2. **FIRE bundle** (R2.7 items 2+4+3 together — they share one chart/page): a **flexible
+   net-worth goal + forecast** (user sets the target; FIRE number is one option) + **forecast**
+   (project trend at current savings rate → projected date) + **milestone markers** on the
+   net-worth history chart. Build it as a general goal/forecast feature, not FIRE-dogma — user is
+   undecided on pursuing FIRE itself, but the progress/trajectory view is useful for any target.
+3. **Quick wins**: KPI sparklines (R2.7 #6, series already computed) + standardise income/expense
+   colour (R2.7 #7).
+4. **Sinking-fund / non-monthly budgeting** (R2.7 #1) — valuable but a meaty standalone.
+5. Investment holdings detail (R2.7 #5) stays blocked on Sharesight creds (Phase 2e).
+- **Next session**: do **R2.1** (correctness fix) first, then decide whether to build the FIRE/goal
+  bundle.
 
 ### Session 12 — Round 2: collapse drill route + IA tidy (2026-06-19)
 Executed REVIEW_PLAN.md Round 2 R2.2 then R2.6.
