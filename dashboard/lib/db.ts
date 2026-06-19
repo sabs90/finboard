@@ -1136,6 +1136,287 @@ export function getHistoricalAccountBalances(): HistoricalBalancePoint[] {
   `).all() as HistoricalBalancePoint[];
 }
 
+// ── Balance Sheet input ───────────────────────────────────────────────────────
+
+// Institutions whose 'investment' accounts count as Investments (vs Other).
+// Mirrors scripts/ingest_balance_sheet.py and getAssetAccountDetails above.
+const INVESTMENT_INSTITUTIONS = ['CMC Markets', 'IG', 'Moelis', 'Stockland'];
+
+export type BalanceGroup = 'Cash' | 'Investments' | 'Other' | 'Property' | 'Liabilities' | 'Mortgages';
+
+export interface BalanceInputAccount {
+  account_id: number;
+  name: string;
+  kind: 'balance' | 'asset' | 'loan';
+  group: BalanceGroup;
+  prev_cents: number | null;
+  prev_date: string | null;
+  facility_type: string | null; // loans only
+  prev_rate: number | null;     // loans only (decimal, e.g. 0.0619)
+}
+
+export function getLatestSnapshotDate(): string | null {
+  const db = getDb();
+  const row = db.prepare(
+    `SELECT MAX(snapshot_date) AS d FROM net_worth_snapshots`
+  ).get() as { d: string | null };
+  return row.d ?? null;
+}
+
+/**
+ * Every manually-tracked balance-sheet line item with its most recent value,
+ * grouped for the balance-sheet input page. Accounts in account_balances
+ * (cash / investments / vehicles / crypto / credit cards), property (assets)
+ * and mortgages (loan_snapshots) are all returned in one ordered list.
+ */
+export function getBalanceInputAccounts(): BalanceInputAccount[] {
+  const db = getDb();
+
+  const balanceAccts = db.prepare(`
+    SELECT a.id AS account_id, a.name, a.account_type, a.institution,
+           ab.balance_cents AS prev_cents, ab.balance_date AS prev_date
+    FROM accounts a
+    LEFT JOIN account_balances ab ON ab.account_id = a.id
+      AND ab.balance_date = (SELECT MAX(balance_date) FROM account_balances WHERE account_id = a.id)
+    WHERE a.source = 'manual'
+      AND a.account_type IN ('savings', 'transaction', 'investment', 'asset', 'liability')
+    ORDER BY a.name
+  `).all() as {
+    account_id: number; name: string; account_type: string; institution: string;
+    prev_cents: number | null; prev_date: string | null;
+  }[];
+
+  const balances: BalanceInputAccount[] = balanceAccts.map((a) => {
+    let group: BalanceGroup;
+    if (a.account_type === 'savings' || a.account_type === 'transaction') group = 'Cash';
+    else if (a.account_type === 'liability') group = 'Liabilities';
+    else if (a.account_type === 'investment' && INVESTMENT_INSTITUTIONS.includes(a.institution)) group = 'Investments';
+    else group = 'Other';
+    return {
+      account_id: a.account_id, name: a.name, kind: 'balance', group,
+      prev_cents: a.prev_cents, prev_date: a.prev_date, facility_type: null, prev_rate: null,
+    };
+  });
+
+  const property = db.prepare(`
+    SELECT a.id AS account_id, a.name,
+           ast.value_cents AS prev_cents, ast.valuation_date AS prev_date
+    FROM accounts a
+    LEFT JOIN assets ast ON ast.account_id = a.id
+      AND ast.valuation_date = (SELECT MAX(valuation_date) FROM assets WHERE account_id = a.id)
+    WHERE a.source = 'manual' AND a.account_type = 'property'
+    ORDER BY a.name
+  `).all() as { account_id: number; name: string; prev_cents: number | null; prev_date: string | null }[];
+
+  const propertyRows: BalanceInputAccount[] = property.map((p) => ({
+    account_id: p.account_id, name: p.name, kind: 'asset', group: 'Property',
+    prev_cents: p.prev_cents, prev_date: p.prev_date, facility_type: null, prev_rate: null,
+  }));
+
+  const loans = db.prepare(`
+    SELECT a.id AS account_id, a.name,
+           ls.outstanding_cents AS prev_cents, ls.snapshot_date AS prev_date,
+           ls.interest_rate AS prev_rate, ls.facility_type
+    FROM accounts a
+    LEFT JOIN loan_snapshots ls ON ls.account_id = a.id
+      AND ls.snapshot_date = (SELECT MAX(snapshot_date) FROM loan_snapshots WHERE account_id = a.id)
+    WHERE a.source = 'manual' AND a.account_type = 'mortgage'
+    ORDER BY a.name
+  `).all() as {
+    account_id: number; name: string; prev_cents: number | null; prev_date: string | null;
+    prev_rate: number | null; facility_type: string | null;
+  }[];
+
+  const loanRows: BalanceInputAccount[] = loans.map((l) => ({
+    account_id: l.account_id, name: l.name, kind: 'loan', group: 'Mortgages',
+    prev_cents: l.prev_cents, prev_date: l.prev_date,
+    facility_type: l.facility_type, prev_rate: l.prev_rate,
+  }));
+
+  return [...balances, ...propertyRows, ...loanRows];
+}
+
+export interface BalanceEntry {
+  account_id: number;
+  kind: 'balance' | 'asset' | 'loan';
+  cents: number;
+  rate?: number | null; // loans only, decimal
+}
+
+/**
+ * Recompute the net_worth_snapshots row for a date by carry-forward summing
+ * the most recent value (on or before that date) of every manual line item.
+ * Classification mirrors scripts/ingest_balance_sheet.py exactly.
+ */
+function recomputeNetWorthSnapshot(db: Database.Database, date: string): void {
+  const sumAsOf = (sql: string): number =>
+    (db.prepare(sql).get(date) as { total: number }).total;
+
+  const cash = sumAsOf(`
+    SELECT COALESCE(SUM((
+      SELECT ab.balance_cents FROM account_balances ab
+      WHERE ab.account_id = a.id AND ab.balance_date <= ?
+      ORDER BY ab.balance_date DESC LIMIT 1
+    )), 0) AS total
+    FROM accounts a
+    WHERE a.source = 'manual' AND a.account_type IN ('savings', 'transaction')
+  `);
+
+  const investment = sumAsOf(`
+    SELECT COALESCE(SUM((
+      SELECT ab.balance_cents FROM account_balances ab
+      WHERE ab.account_id = a.id AND ab.balance_date <= ?
+      ORDER BY ab.balance_date DESC LIMIT 1
+    )), 0) AS total
+    FROM accounts a
+    WHERE a.source = 'manual' AND a.account_type = 'investment'
+      AND a.institution IN ('CMC Markets', 'IG', 'Moelis', 'Stockland')
+  `);
+
+  const otherInvest = sumAsOf(`
+    SELECT COALESCE(SUM((
+      SELECT ab.balance_cents FROM account_balances ab
+      WHERE ab.account_id = a.id AND ab.balance_date <= ?
+      ORDER BY ab.balance_date DESC LIMIT 1
+    )), 0) AS total
+    FROM accounts a
+    WHERE a.source = 'manual' AND a.account_type = 'investment'
+      AND a.institution NOT IN ('CMC Markets', 'IG', 'Moelis', 'Stockland')
+  `);
+
+  const vehicles = sumAsOf(`
+    SELECT COALESCE(SUM((
+      SELECT ab.balance_cents FROM account_balances ab
+      WHERE ab.account_id = a.id AND ab.balance_date <= ?
+      ORDER BY ab.balance_date DESC LIMIT 1
+    )), 0) AS total
+    FROM accounts a
+    WHERE a.source = 'manual' AND a.account_type = 'asset'
+  `);
+
+  const otherLiab = sumAsOf(`
+    SELECT COALESCE(SUM((
+      SELECT ab.balance_cents FROM account_balances ab
+      WHERE ab.account_id = a.id AND ab.balance_date <= ?
+      ORDER BY ab.balance_date DESC LIMIT 1
+    )), 0) AS total
+    FROM accounts a
+    WHERE a.source = 'manual' AND a.account_type = 'liability'
+  `);
+
+  const property = sumAsOf(`
+    SELECT COALESCE(SUM((
+      SELECT ast.value_cents FROM assets ast
+      WHERE ast.account_id = a.id AND ast.valuation_date <= ?
+      ORDER BY ast.valuation_date DESC LIMIT 1
+    )), 0) AS total
+    FROM accounts a
+    WHERE a.source = 'manual' AND a.account_type = 'property'
+  `);
+
+  const mortgage = sumAsOf(`
+    SELECT COALESCE(SUM((
+      SELECT ls.outstanding_cents FROM loan_snapshots ls
+      WHERE ls.account_id = a.id AND ls.snapshot_date <= ?
+      ORDER BY ls.snapshot_date DESC LIMIT 1
+    )), 0) AS total
+    FROM accounts a
+    WHERE a.source = 'manual' AND a.account_type = 'mortgage'
+  `);
+
+  const otherAssets = vehicles + otherInvest;
+  const totalAssets = cash + investment + property + otherAssets;
+  const totalLiab = mortgage + otherLiab;
+  const netWorth = totalAssets - totalLiab;
+  const propertyEquity = property - mortgage;
+
+  db.prepare(`
+    INSERT INTO net_worth_snapshots
+      (snapshot_date, total_assets_cents, total_liabilities_cents, net_worth_cents,
+       cash_cents, investment_cents, property_value_cents, property_equity_cents,
+       other_assets_cents, mortgage_cents, other_liabilities_cents, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, unixepoch())
+    ON CONFLICT(snapshot_date) DO UPDATE SET
+      total_assets_cents      = excluded.total_assets_cents,
+      total_liabilities_cents = excluded.total_liabilities_cents,
+      net_worth_cents         = excluded.net_worth_cents,
+      cash_cents              = excluded.cash_cents,
+      investment_cents        = excluded.investment_cents,
+      property_value_cents    = excluded.property_value_cents,
+      property_equity_cents   = excluded.property_equity_cents,
+      other_assets_cents      = excluded.other_assets_cents,
+      mortgage_cents          = excluded.mortgage_cents,
+      other_liabilities_cents = excluded.other_liabilities_cents
+  `).run(
+    date, totalAssets, totalLiab, netWorth,
+    cash, investment, property, propertyEquity,
+    otherAssets, mortgage, otherLiab,
+  );
+}
+
+export interface SaveBalanceResult {
+  date: string;
+  accountsUpdated: number;
+  netWorthCents: number;
+}
+
+/**
+ * Persist a set of balance-sheet values for a quarter-end date, then recompute
+ * the net worth snapshot. Each entry writes to the table appropriate to its
+ * kind (balance → account_balances, asset → assets, loan → loan_snapshots).
+ * Idempotent: re-saving the same date overwrites that date's values.
+ */
+export function saveBalanceSnapshot(date: string, entries: BalanceEntry[]): SaveBalanceResult {
+  const db = getDb();
+  const run = db.transaction(() => {
+    let count = 0;
+    for (const e of entries) {
+      if (e.kind === 'balance') {
+        db.prepare(`
+          INSERT INTO account_balances (account_id, balance_date, balance_cents, source, created_at)
+          VALUES (?, ?, ?, 'manual', unixepoch())
+          ON CONFLICT(account_id, balance_date) DO UPDATE SET balance_cents = excluded.balance_cents
+        `).run(e.account_id, date, e.cents);
+      } else if (e.kind === 'asset') {
+        // assets has no unique index on (account_id, valuation_date) — upsert manually
+        const existing = db.prepare(
+          `SELECT id FROM assets WHERE account_id = ? AND valuation_date = ?`
+        ).get(e.account_id, date) as { id: number } | undefined;
+        if (existing) {
+          db.prepare(`UPDATE assets SET value_cents = ? WHERE id = ?`).run(e.cents, existing.id);
+        } else {
+          db.prepare(`
+            INSERT INTO assets (account_id, valuation_date, value_cents, source, created_at)
+            VALUES (?, ?, ?, 'manual', unixepoch())
+          `).run(e.account_id, date, e.cents);
+        }
+      } else {
+        const facility = db.prepare(
+          `SELECT facility_type FROM loan_snapshots WHERE account_id = ?
+           ORDER BY snapshot_date DESC LIMIT 1`
+        ).get(e.account_id) as { facility_type: string | null } | undefined;
+        db.prepare(`
+          INSERT INTO loan_snapshots
+            (account_id, snapshot_date, outstanding_cents, interest_rate, facility_type, source, created_at)
+          VALUES (?, ?, ?, ?, ?, 'manual', unixepoch())
+          ON CONFLICT(account_id, snapshot_date) DO UPDATE SET
+            outstanding_cents = excluded.outstanding_cents,
+            interest_rate = COALESCE(excluded.interest_rate, loan_snapshots.interest_rate),
+            facility_type = excluded.facility_type
+        `).run(e.account_id, date, e.cents, e.rate ?? null, facility?.facility_type ?? null);
+      }
+      count += 1;
+    }
+
+    recomputeNetWorthSnapshot(db, date);
+    const snap = db.prepare(
+      `SELECT net_worth_cents FROM net_worth_snapshots WHERE snapshot_date = ?`
+    ).get(date) as { net_worth_cents: number };
+    return { date, accountsUpdated: count, netWorthCents: snap.net_worth_cents };
+  });
+  return run();
+}
+
 // ── Cash Flow ───────────────────────────────────────────────────────────────
 
 export interface CashflowRow {

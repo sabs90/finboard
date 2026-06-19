@@ -41,6 +41,7 @@ const navSections: NavSection[] = [
     items: [
       { href: '/networth', label: 'Net Worth' },
       { href: '/balance-sheet', label: 'Balance Sheet' },
+      { href: '/balance-input', label: 'Update Balances' },
     ],
   },
   {

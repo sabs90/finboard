@@ -223,6 +223,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_i
 - [x] Stacked area breakdown (property equity / investments / cash / other — 30 quarters)
 - [x] KPI cards with QoQ and YoY change
 - [x] Assets + liabilities breakdown tables
+- [x] `/balance-input` page — manual quarterly balance entry (Session 9)
 
 #### 4f — Transactions
 - [x] Full transaction list, paginated (30 per page)
@@ -252,6 +253,26 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_i
 ---
 
 ## Session Log
+
+### Session 9 — Balance sheet input page (2026-06-19)
+- Built `/balance-input` ("Update Balances" under the Wealth nav section): a quarterly
+  manual balance-entry page.
+  - Shows every manual line item grouped (Cash / Investments / Other Assets / Property /
+    Mortgages / Other Liabilities), each row pre-filled with its most recent value + date.
+  - As-at date defaults to the next quarter-end after the latest snapshot; editable.
+  - Live net-worth preview (Assets / Liabilities / Net Worth) recalculates as you type.
+  - Save writes each value to the correct table (`account_balances` / `assets` /
+    `loan_snapshots`) for that date, then **recomputes `net_worth_snapshots`** so
+    `/balance-sheet`, `/networth` and the Overview hero update immediately.
+- Implemented entirely in TS (server action `saveBalances` → `saveBalanceSnapshot` in
+  `lib/db.ts`), **not** by shelling out to Python — single writer, avoids the
+  python3-reachability problem flagged for Docker, keeps logic in one place.
+  `recomputeNetWorthSnapshot()` mirrors `scripts/ingest_balance_sheet.py` classification
+  (investment institutions = CMC/IG/Moelis/Stockland; everything else 'investment' →
+  Other Assets). Blank fields carry forward last known value (as-of ≤ date).
+- Verified: recompute SQL matches the existing Python-generated snapshot for 2026-03-31
+  to the cent across all classes; typecheck clean; page returns 200 with real data.
+- New files: `app/balance-input/page.tsx`, `components/balance-sheet/BalanceInputForm.tsx`.
 
 ### Session 0 — Planning
 - Decided on full architecture: Frollo CSV → SQLite → Next.js dashboard

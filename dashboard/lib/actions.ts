@@ -10,9 +10,12 @@ import {
   deleteCategoryRule,
   countRuleMatches,
   applyCategorisations,
+  saveBalanceSnapshot,
   type RuleType,
   type CategorisationEdit,
   type CategorisationSummary,
+  type BalanceEntry,
+  type SaveBalanceResult,
 } from '@/lib/db';
 
 export async function reassignCategory(transactionId: number, categoryId: number): Promise<void> {
@@ -64,4 +67,13 @@ export async function applyBulkCategorisation(edits: CategorisationEdit[]): Prom
   revalidatePath('/spending');
   revalidatePath('/rules');
   return summary;
+}
+
+export async function saveBalances(date: string, entries: BalanceEntry[]): Promise<SaveBalanceResult> {
+  const result = saveBalanceSnapshot(date, entries);
+  revalidatePath('/balance-input');
+  revalidatePath('/balance-sheet');
+  revalidatePath('/networth');
+  revalidatePath('/');
+  return result;
 }
