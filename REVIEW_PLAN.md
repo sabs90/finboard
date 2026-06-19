@@ -1,9 +1,137 @@
 # REVIEW_PLAN.md — Dashboard Review Action Plan
 
 Created: 2026-06-17 (Session 8, post full-site review)
+Round 2 added: 2026-06-19 (Session 10, fresh-eyes review)
 
-This is the actionable checklist coming out of the full UX / IA / functionality review.
+This is the running review checklist. It now holds two rounds:
+- **Round 2** (below) — the active plan, from the 2026-06-19 fresh-eyes review (benchmarked
+  against Copilot / Monarch / Empower / Kubera). **Work this top-down.**
+- **Round 1** — the original 2026-06-17 review; every item shipped (kept for reference).
+
 Tick items off as they land. Ordered by priority. See PROGRESS.md for overall build phases.
+
+---
+
+# Round 2 — Fresh-eyes review action plan (Session 10, 2026-06-19)
+
+Benchmarked Finboard against best-in-class apps. Verdict: asset breadth is Kubera-tier and
+spending analytics are strong; the gaps are (a) a correctness bug inflating spend, (b) a
+duplicated drill-down route, and (c) the signature features the leaders headline — recurring
+detection, a cash-flow flow-viz, and proactive insights. Ordered by leverage.
+
+## R2.1 🔴 Fix: credit-card payments counted as spending (correctness)
+
+**Problem (verified against live DB):** the `Financial → Credit Card Payments` child has
+**$7,268 across 19 txns with `is_transfer = 0`**. Paying a card is an internal transfer, not
+consumption — and the card *purchases* are already recorded, so this **double-counts**,
+inflating spend and understating savings rate. `v_monthly_spend` includes every
+`amount_cents < 0 AND is_transfer = 0` row, so these leak in.
+
+**Recommended fix** (mirror the existing `Money Transfers` pattern, which already sets
+`is_transfer = 1`):
+- [ ] **Backfill** existing rows: `UPDATE transactions SET is_transfer = 1, updated_at = …
+  WHERE category_id = (SELECT id FROM categories WHERE name = 'Credit Card Payments')`.
+- [ ] **Make it durable for future ingests.** Two options — pick one:
+  - (A) In `config/categories.json`, map the Frollo "Credit Card Payments" category with
+    `"is_transfer": true` (same shape as the `Transfer` entry), and have the resolver honour it; **or**
+  - (B) Add a `category_rules` row (`rule_type='description'`, the CC-payment keyword,
+    `is_transfer=1`). (A) is cleaner since it keys off the category, not a fragile keyword.
+- [ ] **Audit pass for other internal flows** while here — run the audit query and decide each:
+  - `Financial → Investments` (transfers to brokerage = saving, not spend)
+  - any loan/mortgage **principal** repayments (net-worth-neutral; at least separate from consumption)
+  - confirm `Transfers → Money Transfers` is still correctly flagged.
+- [ ] Re-check: savings rate on `/` and `/cashflow` should rise once CC payments drop out.
+- [ ] Verify: `SELECT SUM(...) FROM v_monthly_spend` no longer contains the CC-payment rows.
+
+## R2.2 🔴 Collapse the duplicated drill-down route (IA + maintenance) ✅ DONE (Session 12)
+
+**Problem:** `app/spending/category/[id]/page.tsx` and `app/deep-dive/page.tsx` were ~240 lines
+each running the **same queries, layout, and components**, reached via two URLs.
+
+**`/deep-dive` (selector + query-param state) is now the single canonical drill page:**
+- [x] `CategorySelector` "View Deep Dive" button → `/deep-dive?parent=…&sub=…`.
+- [x] `CategoryTable` — parent rows → `/deep-dive?parent=…`.
+- [x] `SubcategoryBars` — → `/deep-dive?parent=<parent>&sub=<child>` (uses its `parentCategoryId` prop).
+- [x] `PivotTable` — parent → `?parent=`, child → `?parent=&sub=` (child rows read `parent.parentId` in scope).
+- [x] Ported the **"← Back to {parent}"** breadcrumb for child categories into `/deep-dive`.
+- [x] **Deleted** `app/spending/category/` entirely; also removed the now-orphaned
+  `components/spending/PeriodSelector.tsx` and its unused import in deep-dive.
+- [x] Grep `spending/category` → **zero** source refs; old route 404s. Typecheck clean; every drill
+  entry point (donut, category table, subcategory bars, pivot parent+child, selector) verified 200.
+
+## R2.3 🟠 Recurring / subscriptions detection (biggest feature gap vs leaders) ✅ DONE (Session 11)
+
+Headline feature of both Copilot and Monarch; Finboard has none, but has all the data.
+- [x] `lib/db.ts`: `getRecurring()` — groups non-transfer expenses by `merchant`, keeps series
+  with ≥3 occurrences whose gaps cluster (≥60%) around a monthly/quarterly/annual cadence **and**
+  whose amount coefficient-of-variation ≤ 0.6 (drops ad-hoc spend that merely lands ~monthly —
+  Doordash, Ogalo etc. — while keeping variable-amount utilities). Returns cadence, median &
+  last amount, amount delta, last + next-expected date, monthly-equivalent, status. "now" is
+  anchored to the latest txn date (not wall-clock) so import lag doesn't mark everything overdue.
+- [x] `app/recurring/page.tsx` — grouped by cadence with per-cadence /mo subtotals; KPIs
+  (monthly cost, annualised, price increases, not-seen-recently); status badges flag **price
+  increases** and **"not seen — due {date}"** (possible cancellations).
+- [x] `components/recurring/RecurringList.tsx`.
+- [x] Sidebar: added under **Planning**. `getUpcomingBillsCount(14)` → "N bills expected in the
+  next 14 days" link strip on Overview (only when > 0).
+- [x] Empty state when nothing recurs yet (shared `<EmptyState>`).
+- Verified: 14 series detected on live data (6 active / 7 not-seen / 1 price rise); the not-seen
+  set is genuinely churned utilities/subs (Gmhba, Superloop, Exetel, Ovo). Typecheck clean, 200.
+
+## R2.4 🟠 Cash-flow flow-viz — Sankey / waterfall (biggest aesthetic-credibility gap) ✅ DONE (Session 11)
+
+README originally specced a **waterfall** (income → category spends → net savings); `/cashflow`
+currently ships bars + a table only. The flow viz is Copilot's signature.
+- [x] `components/charts/CashflowWaterfall.tsx` — Recharts waterfall (stacked transparent-base +
+  visible bars with per-`<Cell>` category colours): income (up) → each parent category (down) →
+  net savings. Net bar grounded at zero (drops below the axis when negative).
+- [x] `lib/db.ts`: `getCashflowBreakdown(month)` — income total + spend per parent category + net.
+- [x] Added a **month selector** (`MonthNav basePath=/cashflow`); the waterfall is per-month.
+  Top 8 categories shown, remainder collapsed into "Other".
+- [x] Kept the existing 12-month bar chart + table below; empty state for months with no data.
+- Verified: May 2026 income $18,104 / expense $18,977 / net −$873; empty-month + month nav 200.
+
+## R2.5 🟡 Insights panel + empty/loading states (polish that reads "best in class") ✅ DONE (Session 11)
+
+- [x] `lib/db.ts`: `getInsights(month)` — biggest mover vs 3-mo avg, largest single transaction,
+  new merchant this month, count of categories over budget.
+- [x] `components/overview/InsightsPanel.tsx` on `/` — up to 4 auto-generated chips (mover shown
+  only when |Δ| ≥ 10%; over-budget chip links to `/budget`; amber tone for warnings).
+- [x] **Loading skeletons**: shared `components/ui/PageSkeleton.tsx` + `loading.tsx` on the 10
+  data-display routes (/, spending, transactions, budget, cashflow, recurring, networth,
+  balance-sheet, deep-dive, trends). Skipped the form/manage routes.
+- [x] **Empty states**: factored `components/ui/EmptyState.tsx`; applied on Recurring, Cash Flow
+  and Spending (whole-month-empty). Budget keeps its inline helper banner on purpose — a full
+  empty state would hide the editor needed to set budgets.
+
+## R2.6 🟡 IA tidy ✅ DONE (Session 12)
+
+- [x] **Moved `/balance-input` ("Update Balances") from Wealth → Manage** in `Sidebar.tsx`.
+- [x] **Spending is now a hub**: a single "Spending" sidebar door + a shared tab bar
+  (`components/spending/SpendingTabs.tsx`: Breakdown · Trends · Transactions) on `/spending`,
+  `/trends`, `/transactions`. **Deep Dive demoted** — removed from the sidebar; reachable only by
+  drilling into a category. The Spending door stays highlighted across its tabs + `/deep-dive` via
+  a new `activePrefixes` matcher on the sidebar nav item. Top-level doors cut from ~9 to 6.
+- [x] Net Worth page: the second large chart (NW/assets/debt line) is now a collapsed-by-default
+  `components/ui/CollapsibleCard.tsx` (Show/Hide toggle) to cut scroll.
+
+## R2.7 🟢 Larger features — schedule into Phase 5+, not this round
+
+Captured so they aren't lost; each is its own piece of work:
+- [ ] **Non-monthly / sinking-fund budgeting** — spread annual/quarterly bills (rates, rego,
+  strata, insurance — all present in the data) across months instead of flat monthly budgets.
+- [ ] **Savings goals + FIRE number** — target line on the net-worth chart + progress card.
+- [ ] **Net-worth milestone markers** — README specced them ("granny flat complete", "Zeekr
+  delivered"); annotate the history chart.
+- [ ] **Net-worth forecast** — project the trend forward at the current savings rate.
+- [ ] **Investment holdings detail** — depends on Sharesight (Phase 2e, deferred).
+- [ ] **KPI sparklines** — mini trend inside each KPI card (Copilot-style); series already computed.
+- [ ] **Standardise income/expense colour** — one semantic system (inflow / neutral-outflow /
+  over-budget-warning); today cashflow uses orange, `<Amount>` neutral, deep-dive rose.
+
+---
+
+# Round 1 — Initial review action plan (Session 8, 2026-06-17) — ✅ ALL DONE
 
 ## Direction decisions (locked in this review)
 

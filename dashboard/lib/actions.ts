@@ -11,6 +11,8 @@ import {
   countRuleMatches,
   applyCategorisations,
   saveBalanceSnapshot,
+  dismissRecurring,
+  restoreRecurring,
   type RuleType,
   type CategorisationEdit,
   type CategorisationSummary,
@@ -67,6 +69,18 @@ export async function applyBulkCategorisation(edits: CategorisationEdit[]): Prom
   revalidatePath('/spending');
   revalidatePath('/rules');
   return summary;
+}
+
+export async function hideRecurring(merchant: string): Promise<void> {
+  dismissRecurring(merchant);
+  revalidatePath('/recurring');
+  revalidatePath('/');
+}
+
+export async function unhideRecurring(merchant: string): Promise<void> {
+  restoreRecurring(merchant);
+  revalidatePath('/recurring');
+  revalidatePath('/');
 }
 
 export async function saveBalances(date: string, entries: BalanceEntry[]): Promise<SaveBalanceResult> {

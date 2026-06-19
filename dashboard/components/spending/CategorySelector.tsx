@@ -86,8 +86,11 @@ export function CategorySelector({
         <div className="self-end">
           <button
             onClick={() => {
-              const targetId = selectedChildId ?? selectedParentId;
-              if (targetId) router.push(`/spending/category/${targetId}`);
+              const parts = [
+                ...(selectedParentId ? [`parent=${selectedParentId}`] : []),
+                ...(selectedChildId ? [`sub=${selectedChildId}`] : []),
+              ];
+              router.push(`/deep-dive${parts.length ? `?${parts.join('&')}` : ''}`);
             }}
             className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-medium rounded-lg transition-colors"
           >

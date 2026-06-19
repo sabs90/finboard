@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import {
   getParentCategories,
@@ -22,7 +23,6 @@ import { CategoryTrendChart } from '@/components/charts/CategoryTrendChart';
 import { StackedTrendChart } from '@/components/charts/StackedTrendChart';
 import { SubcategoryBars } from '@/components/spending/SubcategoryBars';
 import { TopMerchants } from '@/components/spending/TopMerchants';
-import { PeriodSelector } from '@/components/spending/PeriodSelector';
 import { CategorySelector } from '@/components/spending/CategorySelector';
 import { TransactionList } from '@/components/transactions/TransactionList';
 import { PeriodSelectorWithParams } from '@/components/spending/PeriodSelectorWithParams';
@@ -178,6 +178,16 @@ export default function DeepDivePage({
           />
         </div>
       </Card>
+
+      {/* Breadcrumb up to the parent category (child view only) */}
+      {!isParent && selectedParentId && (
+        <Link
+          href={`/deep-dive?parent=${selectedParentId}`}
+          className="inline-flex text-sm text-slate-400 hover:text-slate-200 transition-colors"
+        >
+          &larr; Back to {category.parent_name}
+        </Link>
+      )}
 
       {/* Scorecard + period selector */}
       <div className="flex items-start justify-between gap-4 flex-wrap">

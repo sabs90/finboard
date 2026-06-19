@@ -1426,6 +1426,51 @@ export interface CashflowRow {
   net_cents: number;
 }
 
+export interface CashflowCategory {
+  parent_category: string;
+  colour: string;
+  total_cents: number; // positive spend
+}
+
+export interface CashflowBreakdown {
+  incomeCents: number;
+  expenseCents: number;
+  netCents: number;
+  categories: CashflowCategory[]; // per-parent spend, largest first
+}
+
+/**
+ * Single-month cash-flow breakdown for the waterfall: total income, spend per
+ * parent category (positive, largest first) and net savings.
+ */
+export function getCashflowBreakdown(month: string): CashflowBreakdown {
+  const db = getDb();
+
+  const income = (db.prepare(`
+    SELECT COALESCE(SUM(amount_cents), 0) AS t
+    FROM transactions
+    WHERE strftime('%Y-%m', transaction_date) = ?
+      AND amount_cents > 0 AND is_transfer = 0
+  `).get(month) as { t: number }).t;
+
+  const categories = db.prepare(`
+    SELECT
+      COALESCE(pc.name, c.name, 'Uncategorised') AS parent_category,
+      COALESCE(pc.colour, c.colour, '#9CA3AF') AS colour,
+      ABS(SUM(t.amount_cents)) AS total_cents
+    FROM transactions t
+    LEFT JOIN categories c ON t.category_id = c.id
+    LEFT JOIN categories pc ON c.parent_id = pc.id
+    WHERE strftime('%Y-%m', t.transaction_date) = ?
+      AND t.amount_cents < 0 AND t.is_transfer = 0
+    GROUP BY COALESCE(pc.id, c.id)
+    ORDER BY total_cents DESC
+  `).all(month) as CashflowCategory[];
+
+  const expense = categories.reduce((sum, c) => sum + c.total_cents, 0);
+  return { incomeCents: income, expenseCents: expense, netCents: income - expense, categories };
+}
+
 export function getCashflow(months: number): CashflowRow[] {
   const db = getDb();
   const rows = db.prepare(`
@@ -1513,6 +1558,319 @@ export function upsertBudget(categoryId: number, month: string, amountCents: num
       amount_cents = excluded.amount_cents,
       updated_at = unixepoch()
   `).run(categoryId, month, amountCents);
+}
+
+// ── Insights ──────────────────────────────────────────────────────────────────
+
+export interface InsightData {
+  biggestMover: { category: string; thisMonthCents: number; avgCents: number; deltaPct: number } | null;
+  largestTransaction: { label: string; amountCents: number; date: string } | null;
+  newMerchant: { merchant: string; amountCents: number; category: string | null } | null;
+  overBudgetCount: number;
+}
+
+/**
+ * Auto-generated insights for a month: the parent category that moved most vs
+ * its 3-month average, the single largest transaction, the biggest brand-new
+ * merchant, and how many budgeted categories are over budget.
+ */
+export function getInsights(month: string): InsightData {
+  const db = getDb();
+  const firstOfMonth = `${month}-01`;
+
+  const mover = db.prepare(`
+    WITH this AS (
+      SELECT COALESCE(pc.id, c.id) AS pid,
+             COALESCE(pc.name, c.name, 'Uncategorised') AS name,
+             ABS(SUM(t.amount_cents)) AS tot
+      FROM transactions t
+      LEFT JOIN categories c ON t.category_id = c.id
+      LEFT JOIN categories pc ON c.parent_id = pc.id
+      WHERE strftime('%Y-%m', t.transaction_date) = ?
+        AND t.amount_cents < 0 AND t.is_transfer = 0
+      GROUP BY COALESCE(pc.id, c.id)
+    ),
+    avg3 AS (
+      SELECT COALESCE(pc.id, c.id) AS pid,
+             ABS(SUM(t.amount_cents)) / 3.0 AS avgtot
+      FROM transactions t
+      LEFT JOIN categories c ON t.category_id = c.id
+      LEFT JOIN categories pc ON c.parent_id = pc.id
+      WHERE t.transaction_date >= date(?, '-3 months')
+        AND t.transaction_date < ?
+        AND t.amount_cents < 0 AND t.is_transfer = 0
+      GROUP BY COALESCE(pc.id, c.id)
+    )
+    SELECT this.name, this.tot, avg3.avgtot
+    FROM this JOIN avg3 ON this.pid = avg3.pid
+    WHERE avg3.avgtot > 0
+    ORDER BY (this.tot - avg3.avgtot) DESC
+    LIMIT 1
+  `).get(month, firstOfMonth, firstOfMonth) as { name: string; tot: number; avgtot: number } | undefined;
+
+  const largest = db.prepare(`
+    SELECT COALESCE(merchant, description) AS label, ABS(amount_cents) AS amt, transaction_date
+    FROM transactions
+    WHERE strftime('%Y-%m', transaction_date) = ?
+      AND amount_cents < 0 AND is_transfer = 0
+    ORDER BY amount_cents ASC
+    LIMIT 1
+  `).get(month) as { label: string; amt: number; transaction_date: string } | undefined;
+
+  const newMerchant = db.prepare(`
+    SELECT t.merchant,
+           ABS(SUM(t.amount_cents)) AS amt,
+           COALESCE(pc.name, c.name) AS cat
+    FROM transactions t
+    LEFT JOIN categories c ON t.category_id = c.id
+    LEFT JOIN categories pc ON c.parent_id = pc.id
+    WHERE strftime('%Y-%m', t.transaction_date) = ?
+      AND t.amount_cents < 0 AND t.is_transfer = 0
+      AND t.merchant IS NOT NULL AND t.merchant != '' AND t.merchant != 'Unknown'
+      AND t.merchant NOT IN (
+        SELECT merchant FROM transactions
+        WHERE transaction_date < ? AND merchant IS NOT NULL
+      )
+    GROUP BY t.merchant
+    ORDER BY amt DESC
+    LIMIT 1
+  `).get(month, firstOfMonth) as { merchant: string; amt: number; cat: string | null } | undefined;
+
+  const overBudget = db.prepare(`
+    SELECT COUNT(*) AS n FROM v_budget_vs_actual
+    WHERE month = ? AND budget_cents > 0 AND spent_cents > budget_cents
+  `).get(month) as { n: number };
+
+  return {
+    biggestMover: mover
+      ? {
+          category: mover.name,
+          thisMonthCents: mover.tot,
+          avgCents: Math.round(mover.avgtot),
+          deltaPct: mover.avgtot > 0 ? Math.round(((mover.tot - mover.avgtot) / mover.avgtot) * 100) : 0,
+        }
+      : null,
+    largestTransaction: largest
+      ? { label: largest.label, amountCents: largest.amt, date: largest.transaction_date }
+      : null,
+    newMerchant: newMerchant
+      ? { merchant: newMerchant.merchant, amountCents: newMerchant.amt, category: newMerchant.cat }
+      : null,
+    overBudgetCount: overBudget.n,
+  };
+}
+
+// ── Recurring / subscriptions detection ──────────────────────────────────────
+
+export type RecurringCadence = 'monthly' | 'quarterly' | 'annual';
+export type RecurringStatus = 'active' | 'price_increase' | 'overdue';
+
+export interface RecurringSeries {
+  merchant: string;
+  category: string | null;
+  colour: string | null;
+  cadence: RecurringCadence;
+  occurrences: number;
+  medianAmountCents: number;     // typical charge (positive)
+  lastAmountCents: number;       // most recent charge (positive)
+  amountDeltaCents: number;      // lastAmount − previous charge (>0 = price rise)
+  lastDate: string;
+  nextExpectedDate: string;
+  monthlyEquivalentCents: number; // normalised to a per-month cost
+  status: RecurringStatus;
+}
+
+interface CadenceConfig {
+  name: RecurringCadence;
+  days: number;
+  tol: number;
+}
+
+// Only these cadences are treated as "recurring". Frequent retail (groceries,
+// transport) has tiny irregular gaps and is filtered out by the cadence match.
+const CADENCES: CadenceConfig[] = [
+  { name: 'monthly',   days: 30.44, tol: 8 },
+  { name: 'quarterly', days: 91.31, tol: 20 },
+  { name: 'annual',    days: 365.25, tol: 45 },
+];
+
+function daysBetween(a: string, b: string): number {
+  const ms = Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z');
+  return ms / 86_400_000;
+}
+
+function addDays(date: string, days: number): string {
+  const d = new Date(Date.parse(date + 'T00:00:00Z') + Math.round(days) * 86_400_000);
+  return d.toISOString().slice(0, 10);
+}
+
+function median(nums: number[]): number {
+  if (nums.length === 0) return 0;
+  const s = [...nums].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2);
+}
+
+/**
+ * Detect recurring charges (subscriptions / regular bills) from transaction
+ * history. Groups expenses by merchant and keeps series of ≥3 charges whose
+ * gaps cluster around a monthly / quarterly / annual cadence. Returns the
+ * cadence, typical & latest amount, last & next-expected date, a price-change
+ * delta and a monthly-equivalent cost. "now" is anchored to the latest
+ * transaction in the DB (not wall-clock) so import lag doesn't mark everything
+ * overdue.
+ */
+/** Recurring series the user has hidden are detected at read time, so we need a
+ * small table to remember dismissals. Created lazily so the live DB doesn't
+ * require a db_init re-run. */
+function ensureRecurringDismissals(db: Database.Database): void {
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS recurring_dismissals (
+      merchant   TEXT PRIMARY KEY,
+      created_at INTEGER NOT NULL
+    )
+  `).run();
+}
+
+export function getDismissedRecurring(): string[] {
+  const db = getDb();
+  ensureRecurringDismissals(db);
+  const rows = db.prepare(`SELECT merchant FROM recurring_dismissals ORDER BY merchant`).all() as { merchant: string }[];
+  return rows.map((r) => r.merchant);
+}
+
+export function dismissRecurring(merchant: string): void {
+  const db = getDb();
+  ensureRecurringDismissals(db);
+  db.prepare(`
+    INSERT INTO recurring_dismissals (merchant, created_at) VALUES (?, unixepoch())
+    ON CONFLICT(merchant) DO NOTHING
+  `).run(merchant);
+}
+
+export function restoreRecurring(merchant: string): void {
+  const db = getDb();
+  ensureRecurringDismissals(db);
+  db.prepare(`DELETE FROM recurring_dismissals WHERE merchant = ?`).run(merchant);
+}
+
+export function getRecurring(): RecurringSeries[] {
+  const db = getDb();
+  ensureRecurringDismissals(db);
+  const dismissed = new Set(
+    (db.prepare(`SELECT merchant FROM recurring_dismissals`).all() as { merchant: string }[]).map((r) => r.merchant),
+  );
+  const rows = db.prepare(`
+    SELECT
+      t.merchant,
+      t.transaction_date,
+      t.amount_cents,
+      c.name AS category,
+      COALESCE(pc.name, c.name) AS parent_category,
+      COALESCE(pc.colour, c.colour) AS colour
+    FROM transactions t
+    LEFT JOIN categories c ON t.category_id = c.id
+    LEFT JOIN categories pc ON c.parent_id = pc.id
+    WHERE t.amount_cents < 0
+      AND t.is_transfer = 0
+      AND t.merchant IS NOT NULL
+      AND t.merchant != ''
+      AND t.merchant != 'Unknown'
+    ORDER BY t.merchant, t.transaction_date
+  `).all() as {
+    merchant: string; transaction_date: string; amount_cents: number;
+    category: string | null; parent_category: string | null; colour: string | null;
+  }[];
+
+  const nowRow = db.prepare(`SELECT MAX(transaction_date) AS d FROM transactions`).get() as { d: string | null };
+  const now = nowRow.d ?? new Date().toISOString().slice(0, 10);
+
+  // Group consecutive rows by merchant (query is ordered by merchant, date).
+  const groups = new Map<string, typeof rows>();
+  for (const r of rows) {
+    const g = groups.get(r.merchant);
+    if (g) g.push(r); else groups.set(r.merchant, [r]);
+  }
+
+  const series: RecurringSeries[] = [];
+
+  for (const [merchant, txns] of groups) {
+    if (dismissed.has(merchant)) continue;
+    if (txns.length < 3) continue;
+
+    const gaps: number[] = [];
+    for (let i = 1; i < txns.length; i++) {
+      gaps.push(daysBetween(txns[i - 1].transaction_date, txns[i].transaction_date));
+    }
+
+    // Pick the cadence whose band captures the most gaps.
+    let best: { cfg: CadenceConfig; score: number; matched: number[] } | null = null;
+    for (const cfg of CADENCES) {
+      const matched = gaps.filter((g) => Math.abs(g - cfg.days) <= cfg.tol);
+      const score = matched.length / gaps.length;
+      if (!best || score > best.score) best = { cfg, score, matched };
+    }
+    if (!best || best.score < 0.6 || best.matched.length < 2) continue;
+
+    const amounts = txns.map((t) => Math.abs(t.amount_cents));
+
+    // Amount consistency (coefficient of variation) separates real recurring
+    // charges — fixed subscriptions (~0) and variable bills like utilities
+    // (~0.5) — from ad-hoc spend at a merchant that merely lands ~monthly.
+    const mean = amounts.reduce((a, b) => a + b, 0) / amounts.length;
+    const sd = Math.sqrt(amounts.reduce((a, b) => a + (b - mean) ** 2, 0) / amounts.length);
+    if (mean > 0 && sd / mean > 0.6) continue;
+
+    const medianAmountCents = median(amounts);
+    const lastAmountCents = amounts[amounts.length - 1];
+    const prevAmountCents = amounts[amounts.length - 2];
+    const amountDeltaCents = lastAmountCents - prevAmountCents;
+
+    const typicalGap = median(best.matched);
+    const lastDate = txns[txns.length - 1].transaction_date;
+    const nextExpectedDate = addDays(lastDate, typicalGap);
+
+    const monthlyEquivalentCents = Math.round(medianAmountCents * (30.44 / best.cfg.days));
+
+    // Overdue = we're already a full tolerance past the next-expected date
+    // (a likely cancellation). Price increase = last charge meaningfully higher.
+    let status: RecurringStatus = 'active';
+    if (daysBetween(nextExpectedDate, now) > best.cfg.tol) {
+      status = 'overdue';
+    } else if (amountDeltaCents > 100 && amountDeltaCents / prevAmountCents > 0.05) {
+      status = 'price_increase';
+    }
+
+    series.push({
+      merchant,
+      category: txns[txns.length - 1].parent_category,
+      colour: txns[txns.length - 1].colour,
+      cadence: best.cfg.name,
+      occurrences: txns.length,
+      medianAmountCents,
+      lastAmountCents,
+      amountDeltaCents,
+      lastDate,
+      nextExpectedDate,
+      monthlyEquivalentCents,
+      status,
+    });
+  }
+
+  // Biggest monthly cost first.
+  series.sort((a, b) => b.monthlyEquivalentCents - a.monthlyEquivalentCents);
+  return series;
+}
+
+/** Count of active recurring charges expected within the next `days` days. */
+export function getUpcomingBillsCount(withinDays = 14): number {
+  const series = getRecurring();
+  const db = getDb();
+  const nowRow = db.prepare(`SELECT MAX(transaction_date) AS d FROM transactions`).get() as { d: string | null };
+  const now = nowRow.d ?? new Date().toISOString().slice(0, 10);
+  return series.filter(
+    (s) => s.status !== 'overdue' && daysBetween(now, s.nextExpectedDate) >= 0 && daysBetween(now, s.nextExpectedDate) <= withinDays,
+  ).length;
 }
 
 export function getPivotData(months: number): PivotRow[] {

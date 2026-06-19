@@ -1,12 +1,41 @@
-import { getCashflow } from '@/lib/db';
-import { formatCurrency, formatMonth } from '@/lib/formatters';
+import { getCashflow, getCashflowBreakdown } from '@/lib/db';
+import { formatCurrency, formatMonth, getCurrentMonth } from '@/lib/formatters';
 import { KpiCard } from '@/components/ui/KpiCard';
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { CashflowChart } from '@/components/charts/CashflowChart';
+import { CashflowWaterfall, type WaterfallCategory } from '@/components/charts/CashflowWaterfall';
+import { MonthNav } from '@/components/spending/MonthNav';
 
 const MONTHS = 12;
 
-export default function CashflowPage() {
+/** Top 8 categories by spend; the remainder collapse into a single "Other" bar. */
+function prepareWaterfallCategories(
+  categories: { parent_category: string; colour: string; total_cents: number }[],
+): WaterfallCategory[] {
+  const top = categories.slice(0, 8).map((c) => ({
+    name: c.parent_category,
+    value: c.total_cents,
+    color: c.colour || '#9CA3AF',
+  }));
+  const rest = categories.slice(8);
+  if (rest.length > 0) {
+    top.push({
+      name: 'Other',
+      value: rest.reduce((sum, c) => sum + c.total_cents, 0),
+      color: '#6B7280',
+    });
+  }
+  return top;
+}
+
+export default function CashflowPage({
+  searchParams,
+}: {
+  searchParams: { month?: string };
+}) {
+  const month = searchParams.month ?? getCurrentMonth();
+  const breakdown = getCashflowBreakdown(month);
   const rows = getCashflow(MONTHS);
 
   const chartData = rows.map((r) => ({
@@ -16,41 +45,54 @@ export default function CashflowPage() {
     net: r.net_cents,
   }));
 
-  const latest = rows.length > 0 ? rows[rows.length - 1] : null;
-  const prev = rows.length >= 2 ? rows[rows.length - 2] : null;
-
-  const savingsRate = latest && latest.income_cents > 0
-    ? Math.round((latest.net_cents / latest.income_cents) * 100)
+  const savingsRate = breakdown.incomeCents > 0
+    ? Math.round((breakdown.netCents / breakdown.incomeCents) * 100)
     : null;
 
-  const netChange = latest && prev ? latest.net_cents - prev.net_cents : null;
+  const waterfallCategories = prepareWaterfallCategories(breakdown.categories);
+  const hasMonthData = breakdown.incomeCents > 0 || breakdown.expenseCents > 0;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-slate-100">Cash Flow</h1>
-        <span className="text-sm text-slate-400">Last {MONTHS} months</span>
+        <MonthNav month={month} basePath="/cashflow" />
       </div>
 
-      {latest ? (
+      {hasMonthData ? (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <KpiCard label={`Income — ${formatMonth(latest.month)}`} value={formatCurrency(latest.income_cents)} />
-            <KpiCard label="Expenses" value={formatCurrency(latest.expense_cents)} />
-            <KpiCard
-              label="Net Savings"
-              value={formatCurrency(latest.net_cents)}
-              trend={netChange !== null ? {
-                value: `${formatCurrency(Math.abs(netChange))} vs last month`,
-                positive: netChange >= 0,
-              } : undefined}
-            />
+            <KpiCard label={`Income — ${formatMonth(month)}`} value={formatCurrency(breakdown.incomeCents)} />
+            <KpiCard label="Expenses" value={formatCurrency(breakdown.expenseCents)} />
+            <KpiCard label="Net Savings" value={formatCurrency(breakdown.netCents)} />
             <KpiCard label="Savings Rate" value={savingsRate !== null ? `${savingsRate}%` : '—'} />
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>Income vs Expenses</CardTitle>
+              <CardTitle>Where the money went — {formatMonth(month)}</CardTitle>
+            </CardHeader>
+            <div className="px-4 pb-6 pt-2 sm:px-6">
+              <CashflowWaterfall
+                incomeCents={breakdown.incomeCents}
+                categories={waterfallCategories}
+                netCents={breakdown.netCents}
+              />
+            </div>
+          </Card>
+        </>
+      ) : (
+        <EmptyState
+          title={`No cash flow for ${formatMonth(month)}`}
+          message="There are no income or expense transactions in this month. Try another month."
+        />
+      )}
+
+      {rows.length > 0 && (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Income vs Expenses — last {MONTHS} months</CardTitle>
             </CardHeader>
             <div className="px-6 pb-6 pt-2">
               <CashflowChart data={chartData} />
@@ -94,10 +136,6 @@ export default function CashflowPage() {
             </div>
           </Card>
         </>
-      ) : (
-        <Card>
-          <div className="p-8 text-center text-slate-500 text-sm">No transaction data available.</div>
-        </Card>
       )}
     </div>
   );

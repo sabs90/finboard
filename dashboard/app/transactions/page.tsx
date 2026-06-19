@@ -7,6 +7,7 @@ import { TransactionFilters } from '@/components/transactions/TransactionFilters
 import { Pagination } from '@/components/transactions/Pagination';
 import { FlagToggle } from '@/components/transactions/FlagToggle';
 import { NoteInput } from '@/components/transactions/NoteInput';
+import { SpendingTabs } from '@/components/spending/SpendingTabs';
 
 const PAGE_SIZE = 30;
 
@@ -45,6 +46,8 @@ export default function TransactionsPage({
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-slate-100">Transactions</h1>
+
+      <SpendingTabs />
 
       <TransactionFilters accounts={accounts} categories={categories} />
 

@@ -214,9 +214,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_i
 - [x] Monthly Trends pivot table (6-month parent/child expand-collapse, avg column, frozen header)
 
 #### 4d — Cash Flow
-- [ ] Waterfall chart: income → spends by category → net savings
-- [ ] Monthly view
-- [ ] Prior month comparison
+- [x] Waterfall chart: income → spends by category → net savings (Session 11)
+- [x] Monthly view (month selector on /cashflow — Session 11)
+- [x] Prior month comparison (12-month bar chart + table retained below waterfall)
+- [x] Recurring / subscriptions detection (`/recurring`) + upcoming-bills on Overview (Session 11)
+- [x] Insights panel on Overview; loading skeletons + shared empty states (Session 11)
 
 #### 4e — Net Worth Over Time
 - [x] Line chart of total net worth
@@ -253,6 +255,64 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_i
 ---
 
 ## Session Log
+
+### Session 12 — Round 2: collapse drill route + IA tidy (2026-06-19)
+Executed REVIEW_PLAN.md Round 2 R2.2 then R2.6.
+- **R2.2 Collapsed the duplicated drill route**: `/deep-dive` (selector + `?parent=&sub=` query
+  state) is the single canonical drill page. Repointed every entry point — `CategoryTable`,
+  `SubcategoryBars`, `PivotTable` (parent + child rows), and `CategorySelector`'s button — to
+  `/deep-dive`. Ported the "← Back to {parent}" breadcrumb for child views. Deleted
+  `app/spending/category/[id]` and the orphaned `components/spending/PeriodSelector.tsx`. Zero
+  `spending/category` source refs remain; old route 404s; typecheck clean; all drill paths 200.
+- **R2.6 IA tidy**: (1) moved "Update Balances" (`/balance-input`) from Wealth → Manage; (2) made
+  Spending a **hub** — one sidebar door + a shared tab bar (`SpendingTabs`: Breakdown · Trends ·
+  Transactions) on /spending, /trends, /transactions, with **Deep Dive demoted** out of the
+  sidebar (drill-in only). Added an `activePrefixes` matcher so "Spending" highlights across its
+  tabs and /deep-dive. Top-level nav doors cut ~9 → 6. (3) Net Worth's secondary line chart is now
+  a collapsed-by-default `CollapsibleCard` to cut scroll.
+- New files: `components/spending/SpendingTabs.tsx`, `components/ui/CollapsibleCard.tsx`.
+- **Next**: R2.1 (CC-payment correctness fix — still the only open 🔴; spend/savings figures stay
+  inflated until it lands), then R2.5 polish remainder / R2.7 larger features.
+
+### Session 11 — Round 2: recurring, cash-flow waterfall, insights (2026-06-19)
+Executed REVIEW_PLAN.md Round 2 R2.3 → R2.4 → R2.5 (skipped R2.1/R2.2 at user's direction).
+- **R2.3 Recurring detection** (`/recurring`): `getRecurring()` groups non-transfer expenses by
+  merchant, keeps ≥3-occurrence series whose gaps cluster (≥60%) around monthly/quarterly/annual
+  cadence AND whose amount CV ≤ 0.6 (cadence regularity is the primary filter; CV drops ad-hoc
+  spend that lands ~monthly but keeps variable utilities). Anchors "now" to latest txn date so
+  import lag doesn't flag everything overdue. Page: per-cadence groups w/ /mo subtotals, KPIs,
+  status badges (price ↑ / not-seen-recently). Sidebar under Planning; `getUpcomingBillsCount()`
+  → Overview link strip. 14 series detected on live data; verified against a standalone prototype.
+- **R2.4 Cash-flow waterfall** (`/cashflow`): `CashflowWaterfall` (Recharts stacked transparent
+  base + per-Cell coloured bars): income → parent categories → net. `getCashflowBreakdown(month)`;
+  added month selector; top-8 categories + "Other"; kept 12-mo chart/table below. Net bar drops
+  below axis when negative. Empty state for dataless months.
+- **R2.5 Insights + states**: `getInsights(month)` (biggest mover vs 3-mo avg, largest txn, new
+  merchant, over-budget count) → `InsightsPanel` on Overview (mover shown only when |Δ|≥10%).
+  Shared `PageSkeleton` + `loading.tsx` on 10 display routes. Shared `EmptyState` applied to
+  Recurring / Cash Flow / Spending (Budget keeps inline helper so the editor stays visible).
+- Typecheck clean throughout; all routes 200. New files: `app/recurring/page.tsx`,
+  `components/recurring/RecurringList.tsx`, `components/charts/CashflowWaterfall.tsx`,
+  `components/overview/InsightsPanel.tsx`, `components/ui/EmptyState.tsx`,
+  `components/ui/PageSkeleton.tsx`, 10× `loading.tsx`.
+- **Next**: R2.1 (CC-payment correctness fix — still open; spend/savings figures wrong until it
+  lands) and R2.2 (collapse duplicated drill route), then R2.6 IA tidy.
+
+### Session 10 — Fresh-eyes review + Round 2 plan (2026-06-19)
+- Benchmarked Finboard against best-in-class apps (Copilot / Monarch / Empower / Kubera).
+  Verdict: asset breadth is Kubera-tier, spending analytics strong; gaps are a correctness
+  bug, a duplicated drill route, and the signature features leaders headline.
+- **Found a correctness bug** (verified against live DB): `Financial → Credit Card Payments`
+  ($7,268 / 19 txns) has `is_transfer = 0`, so card repayments are counted as spending and
+  double-count against the recorded purchases — inflating spend, understating savings rate.
+  Logged in Known Issues; fix is R2.1.
+- **Found a duplicated route**: `app/spending/category/[id]` and `app/deep-dive` are the same
+  view via two URLs (and deep-dive's selector navigates to the `[id]` route). Consolidation is R2.2.
+- Wrote the full **Round 2 action plan in `REVIEW_PLAN.md`** (R2.1–R2.7), ordered by leverage:
+  CC-payment fix → collapse drill route → recurring detection → cash-flow waterfall → insights +
+  empty/loading states → IA tidy → larger features (sinking-fund budgets, goals/FIRE, milestones).
+- **Next**: work `REVIEW_PLAN.md` Round 2 top-down — R2.1 (CC-payment fix) first; it's quick and
+  the spend/savings figures are wrong until it lands.
 
 ### Session 9 — Balance sheet input page (2026-06-19)
 - Built `/balance-input` ("Update Balances" under the Wealth nav section): a quarterly
@@ -414,10 +474,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_i
 
 ## Known Issues / Blockers
 
+- 🔴 **Credit-card payments counted as spending** (found Session 10): `Financial → Credit Card
+  Payments` rows have `is_transfer = 0`, so card repayments ($7,268 / 19 txns) leak into
+  `v_monthly_spend`, double-counting against recorded purchases and understating savings rate.
+  Fix = REVIEW_PLAN R2.1 (backfill `is_transfer = 1` + map the Frollo category as a transfer).
 - ~~**Dead nav links**: `/budget` and `/cashflow` 404~~ — resolved Session 8 (both pages built).
 - ~~**Bad net-worth quarter**: 2025-09-30 showed ~ -$1.05M~~ — resolved; now +$1.02M after source spreadsheet was completed and ingest re-run.
 
-See **`REVIEW_PLAN.md`** for the full post-review action checklist (Session 8).
+See **`REVIEW_PLAN.md`** for the full post-review action checklist — **Round 2 (Session 10) is the active plan**.
 
 ---
 

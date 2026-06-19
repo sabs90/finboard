@@ -1,4 +1,4 @@
-import { getOverviewKpis, getCategoryBreakdown, getMonthlyTotals, getRecentTransactions, getLatestNetWorthSnapshot, getSpendIncomeUpToDay } from '@/lib/db';
+import { getOverviewKpis, getCategoryBreakdown, getMonthlyTotals, getRecentTransactions, getLatestNetWorthSnapshot, getSpendIncomeUpToDay, getUpcomingBillsCount, getInsights } from '@/lib/db';
 import { getCurrentMonth, formatCurrency, formatDollars, formatDate, formatMonth, prevMonth } from '@/lib/formatters';
 import Link from 'next/link';
 import { KpiCard } from '@/components/ui/KpiCard';
@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Amount } from '@/components/ui/Amount';
 import { SpendingDonut } from '@/components/charts/SpendingDonut';
 import { MonthlyBarChart } from '@/components/charts/MonthlyBarChart';
+import { InsightsPanel } from '@/components/overview/InsightsPanel';
 import { getCategoryColor } from '@/lib/chartColors';
 
 function prepareDonutData(rows: { parent_category: string; category_id: number | null; colour: string; total_cents: number }[]) {
@@ -35,6 +36,8 @@ export default function OverviewPage() {
   const monthlyTotals = getMonthlyTotals(6);
   const recentTransactions = getRecentTransactions(10);
   const netWorth = getLatestNetWorthSnapshot();
+  const upcomingBills = getUpcomingBillsCount(14);
+  const insights = getInsights(month);
 
   const donutData = prepareDonutData(categoryBreakdown);
   const barData = monthlyTotals.map((r) => ({ month: r.month, total: r.total_cents }));
@@ -137,6 +140,21 @@ export default function OverviewPage() {
           subtitle={formatCurrency(kpis.topCategoryCents)}
         />
       </div>
+
+      <InsightsPanel data={insights} />
+
+      {upcomingBills > 0 && (
+        <Link
+          href="/recurring"
+          className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900 px-6 py-4 hover:border-slate-700 transition-colors"
+        >
+          <span className="text-sm text-slate-300">
+            <span className="font-semibold text-slate-100">{upcomingBills}</span>{' '}
+            recurring {upcomingBills === 1 ? 'bill' : 'bills'} expected in the next 14 days
+          </span>
+          <span className="text-sm text-slate-400">View recurring →</span>
+        </Link>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>

@@ -154,7 +154,7 @@ function ParentGroup({
               style={{ backgroundColor: parent.colour }}
             />
             <Link
-              href={`/spending/category/${parent.parentId}`}
+              href={`/deep-dive?parent=${parent.parentId}`}
               className="font-semibold text-slate-100 hover:text-white transition-colors"
             >
               {parent.parentName}
@@ -185,7 +185,7 @@ function ParentGroup({
         >
           <td className="px-4 py-2 sticky left-0 z-10 bg-slate-900 group-hover:bg-slate-800/20 transition-colors">
             <Link
-              href={`/spending/category/${child.categoryId}`}
+              href={`/deep-dive?parent=${parent.parentId}&sub=${child.categoryId}`}
               className="text-slate-400 hover:text-slate-200 transition-colors pl-10 block"
             >
               {child.categoryName}

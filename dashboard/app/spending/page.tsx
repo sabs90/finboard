@@ -1,11 +1,13 @@
 import { getMonthlySpend, getCategoryBreakdown, getMonthTransactions, getAllCategories } from '@/lib/db';
-import { getCurrentMonth } from '@/lib/formatters';
+import { getCurrentMonth, formatMonth } from '@/lib/formatters';
 import { getCategoryColor } from '@/lib/chartColors';
 import { MonthNav } from '@/components/spending/MonthNav';
 import { CategoryTable } from '@/components/spending/CategoryTable';
 import { TransactionList } from '@/components/transactions/TransactionList';
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { SpendingDonut } from '@/components/charts/SpendingDonut';
+import { SpendingTabs } from '@/components/spending/SpendingTabs';
 
 function prepareDonutData(rows: { parent_category: string; category_id: number | null; colour: string; total_cents: number }[]) {
   const top = rows.slice(0, 8);
@@ -47,6 +49,15 @@ export default function SpendingPage({
         <MonthNav month={month} />
       </div>
 
+      <SpendingTabs />
+
+      {spendRows.length === 0 ? (
+        <EmptyState
+          title={`No spending in ${formatMonth(month)}`}
+          message="There are no expense transactions for this month. Use the arrows above to view another month."
+        />
+      ) : (
+      <>
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -71,6 +82,8 @@ export default function SpendingPage({
       </div>
 
       <TransactionList transactions={transactions} categories={categories} />
+      </>
+      )}
     </div>
   );
 }

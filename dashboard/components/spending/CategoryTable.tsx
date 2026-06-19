@@ -55,7 +55,7 @@ export function CategoryTable({
         {groups.map((group) => (
           <Link
             key={group.parentName}
-            href={group.parentId ? `/spending/category/${group.parentId}` : `/spending?month=${month}`}
+            href={group.parentId ? `/deep-dive?parent=${group.parentId}` : `/spending?month=${month}`}
             className="flex items-center px-6 py-3 hover:bg-slate-800/50 transition-colors group"
           >
             <div className="flex-1">

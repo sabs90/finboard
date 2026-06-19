@@ -9,6 +9,9 @@ interface NavItem {
   href: string;
   label: string;
   exact?: boolean;
+  // Extra path prefixes that should also mark this item active (e.g. the
+  // Spending hub stays active across its tabs and the deep-dive drill page).
+  activePrefixes?: string[];
 }
 
 interface NavSection {
@@ -18,15 +21,11 @@ interface NavSection {
 
 const navSections: NavSection[] = [
   {
-    items: [{ href: '/', label: 'Overview', exact: true }],
-  },
-  {
-    heading: 'Spending',
     items: [
-      { href: '/spending', label: 'Spending' },
-      { href: '/trends', label: 'Trends' },
-      { href: '/deep-dive', label: 'Deep Dive' },
-      { href: '/transactions', label: 'Transactions' },
+      { href: '/', label: 'Overview', exact: true },
+      // Spending is a hub: /spending (Breakdown), /trends, /transactions are
+      // tabs within it, and /deep-dive is its drill-in destination.
+      { href: '/spending', label: 'Spending', activePrefixes: ['/trends', '/transactions', '/deep-dive'] },
     ],
   },
   {
@@ -34,6 +33,7 @@ const navSections: NavSection[] = [
     items: [
       { href: '/budget', label: 'Budget' },
       { href: '/cashflow', label: 'Cash Flow' },
+      { href: '/recurring', label: 'Recurring' },
     ],
   },
   {
@@ -41,7 +41,6 @@ const navSections: NavSection[] = [
     items: [
       { href: '/networth', label: 'Net Worth' },
       { href: '/balance-sheet', label: 'Balance Sheet' },
-      { href: '/balance-input', label: 'Update Balances' },
     ],
   },
   {
@@ -50,6 +49,7 @@ const navSections: NavSection[] = [
       { href: '/import', label: 'Import Data' },
       { href: '/categorise', label: 'Bulk Categorise' },
       { href: '/rules', label: 'Category Rules' },
+      { href: '/balance-input', label: 'Update Balances' },
     ],
   },
 ];
@@ -122,7 +122,8 @@ export function Sidebar({ dataAsOf }: { dataAsOf?: string | null }) {
               {section.items.map((item) => {
                 const isActive = item.exact
                   ? pathname === item.href
-                  : pathname.startsWith(item.href);
+                  : pathname.startsWith(item.href) ||
+                    (item.activePrefixes?.some((p) => pathname.startsWith(p)) ?? false);
                 return (
                   <Link
                     key={item.href}

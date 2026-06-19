@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
 import { NetWorthStackedChart } from '@/components/charts/NetWorthStackedChart';
 import type { NetWorthStackedPoint } from '@/components/charts/NetWorthStackedChart';
 import { NetWorthHistoryChart } from '@/components/charts/NetWorthHistoryChart';
+import { CollapsibleCard } from '@/components/ui/CollapsibleCard';
 
 export default function NetWorthPage() {
   const snap = getLatestNetWorthSnapshot();
@@ -110,15 +111,10 @@ export default function NetWorthPage() {
         </div>
       </Card>
 
-      {/* ── Net worth vs assets vs debt (line) ────────────────────────── */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Net Worth History</CardTitle>
-        </CardHeader>
-        <div className="px-6 pb-6">
-          <NetWorthHistoryChart data={lineData} />
-        </div>
-      </Card>
+      {/* ── Net worth vs assets vs debt (line) — collapsed by default ──── */}
+      <CollapsibleCard title="Net Worth History — Assets vs Debt">
+        <NetWorthHistoryChart data={lineData} />
+      </CollapsibleCard>
 
       {/* ── Link to detailed positions ────────────────────────────────── */}
       <Link

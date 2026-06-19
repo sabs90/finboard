@@ -2,6 +2,7 @@ import { getPivotData } from '@/lib/db';
 import { getCurrentMonth, prevMonth } from '@/lib/formatters';
 import { Card } from '@/components/ui/Card';
 import { PivotTable } from '@/components/spending/PivotTable';
+import { SpendingTabs } from '@/components/spending/SpendingTabs';
 
 interface ParentAccum {
   parentId: number;
@@ -85,6 +86,8 @@ export default function TrendsPage() {
         <h1 className="text-2xl font-bold text-slate-100">Monthly Trends</h1>
         <span className="text-sm text-slate-400">Last 6 months</span>
       </div>
+
+      <SpendingTabs />
 
       <Card>
         {parents.length > 0 ? (

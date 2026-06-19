@@ -195,6 +195,15 @@ CREATE TABLE IF NOT EXISTS category_rules (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_category_rules ON category_rules(rule_type, pattern);
 
+-- Recurring/subscription series the user has dismissed (e.g. cancelled or
+-- expired). Recurring series are *detected* from transactions at read time
+-- (dashboard getRecurring); this table just suppresses a merchant from that
+-- list. Soft + reversible — it never touches the underlying transactions.
+CREATE TABLE IF NOT EXISTS recurring_dismissals (
+    merchant        TEXT PRIMARY KEY,
+    created_at      INTEGER NOT NULL
+);
+
 -- ── views ─────────────────────────────────────────────────────────────────────
 DROP VIEW IF EXISTS v_monthly_spend;
 CREATE VIEW v_monthly_spend AS

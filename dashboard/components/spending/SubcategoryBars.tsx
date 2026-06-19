@@ -28,7 +28,7 @@ export function SubcategoryBars({
         return (
           <Link
             key={item.category_id}
-            href={`/spending/category/${item.category_id}`}
+            href={`/deep-dive?parent=${parentCategoryId}&sub=${item.category_id}`}
             className="block group"
           >
             <div className="flex items-center justify-between mb-1">
