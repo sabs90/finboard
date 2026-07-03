@@ -8,6 +8,12 @@ import { revalidatePath } from 'next/cache';
 // Dashboard runs from dashboard/; scripts + data live one level up.
 const PROJECT_ROOT = path.resolve(process.cwd(), '..');
 
+// Resolve the DB the same way lib/db.ts does — relative to the dashboard cwd.
+// The ingest script runs with cwd=PROJECT_ROOT, so a relative DB_PATH like
+// "../data/finance.db" would resolve one level too high and silently create an
+// empty DB. Pass an absolute path so both sides always hit the same file.
+const DB_PATH = path.resolve(process.cwd(), process.env.DB_PATH || '../data/finance.db');
+
 const SOURCES = {
   frollo: { script: 'scripts/ingest_frollo.py', dir: 'data/exports/frollo', label: 'Frollo' },
   amp: { script: 'scripts/ingest_amp.py', dir: 'data/exports/amp', label: 'AMP' },
@@ -23,7 +29,10 @@ export interface ImportResult {
 
 function runScript(scriptPath: string, filePath: string): Promise<{ code: number | null; out: string }> {
   return new Promise((resolve) => {
-    const child = spawn('python3', [scriptPath, '--file', filePath], { cwd: PROJECT_ROOT });
+    const child = spawn('python3', [scriptPath, '--file', filePath], {
+      cwd: PROJECT_ROOT,
+      env: { ...process.env, DB_PATH },
+    });
     let out = '';
     child.stdout.on('data', (d) => { out += d.toString(); });
     child.stderr.on('data', (d) => { out += d.toString(); });

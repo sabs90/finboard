@@ -1,5 +1,6 @@
 import { getCategoryRules, getAllCategories } from '@/lib/db';
 import { RuleManager } from '@/components/rules/RuleManager';
+import { RecategoriseButton } from '@/components/rules/RecategoriseButton';
 
 export default function RulesPage() {
   const rules = getCategoryRules();
@@ -12,6 +13,7 @@ export default function RulesPage() {
         <span className="text-sm text-slate-400">{rules.length} rules</span>
       </div>
       <RuleManager rules={rules} categories={categories} />
+      <RecategoriseButton />
     </div>
   );
 }

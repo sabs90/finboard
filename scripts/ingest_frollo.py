@@ -34,6 +34,10 @@ from utils.logger import get_logger
 
 logger = get_logger("ingest_frollo")
 
+# Merchant values that mean "no merchant" — never treat these as a merchant rule
+# key (Frollo emits "Unknown" for raw card/ATM/transfer descriptions).
+PLACEHOLDER_MERCHANTS = {"unknown", ""}
+
 
 # ── Data structures ───────────────────────────────────────────────────────────
 
@@ -58,6 +62,7 @@ class IngestStats:
     rows_read: int = 0
     rows_inserted: int = 0
     rows_skipped_duplicate: int = 0
+    rows_recategorised: int = 0
     rows_skipped_error: int = 0
     new_accounts: list[str] = field(default_factory=list)
     unmapped_categories: set[str] = field(default_factory=set)
@@ -152,8 +157,10 @@ def resolve_category(
     Map a transaction to (category_id, parent_category_id, is_transfer).
     Priority: merchant rules > description keyword rules > Frollo category mapping.
     """
-    # 1. Merchant rules override everything
-    if merchant and merchant in merchant_rules:
+    # 1. Merchant rules override everything — but "Unknown" (and blanks) are the
+    # *absence* of a merchant, not a merchant, so never let them match a merchant
+    # rule; that would shadow the description rules these raw entries rely on.
+    if merchant and merchant.strip().lower() not in PLACEHOLDER_MERCHANTS and merchant in merchant_rules:
         return _resolve_mapping(merchant_rules[merchant], category_lookup, uncategorised_id)
 
     # 2. Description keyword rules (for raw card descriptions where merchant is Unknown)
@@ -381,6 +388,11 @@ def ingest_file(conn, path: Path, category_map: dict, merchant_rules: dict, desc
         "SELECT id FROM categories WHERE name = 'Uncategorised' AND parent_id IS NULL"
     ).fetchone()
     uncategorised_id = uncategorised_row["id"] if uncategorised_row else None
+    # Any category named 'Uncategorised' counts as uncategorised when deciding
+    # whether a pre-existing duplicate row is safe to re-categorise.
+    uncategorised_ids = {
+        r["id"] for r in conn.execute("SELECT id FROM categories WHERE name = 'Uncategorised'")
+    }
 
     now = int(time.time())
 
@@ -422,6 +434,28 @@ def ingest_file(conn, path: Path, category_map: dict, merchant_rules: dict, desc
                 stats.rows_inserted += 1
             else:
                 stats.rows_skipped_duplicate += 1
+                # The row already exists (INSERT OR IGNORE dropped it). If it never
+                # got categorised — e.g. it predates a rule we now have — back-fill
+                # the category now. Only touch rows still sitting in Uncategorised
+                # and not manually flagged, so we never clobber an existing choice.
+                if category_id not in uncategorised_ids:
+                    placeholders = ",".join("?" * len(uncategorised_ids))
+                    conn.execute(
+                        f"""
+                        UPDATE transactions
+                        SET category_id = ?, parent_category_id = ?, is_transfer = ?, updated_at = ?
+                        WHERE account_id = ? AND transaction_date = ? AND amount_cents = ?
+                          AND description = ? AND source = 'frollo'
+                          AND is_flagged = 0 AND category_id IN ({placeholders})
+                        """,
+                        (
+                            category_id, parent_category_id, 1 if is_transfer else 0, now,
+                            account_id, row.date, row.amount_cents, row.description,
+                            *uncategorised_ids,
+                        ),
+                    )
+                    if conn.execute("SELECT changes()").fetchone()[0]:
+                        stats.rows_recategorised += 1
 
         except Exception as exc:
             logger.error("Row error for '%s' on %s: %s", row.description, row.date, exc)
@@ -473,8 +507,9 @@ def main() -> None:
         conn.close()
 
     logger.info(
-        "Ingest complete — read: %d | inserted: %d | duplicates: %d | errors: %d",
-        stats.rows_read, stats.rows_inserted, stats.rows_skipped_duplicate, stats.rows_skipped_error,
+        "Ingest complete — read: %d | inserted: %d | duplicates: %d | recategorised: %d | errors: %d",
+        stats.rows_read, stats.rows_inserted, stats.rows_skipped_duplicate,
+        stats.rows_recategorised, stats.rows_skipped_error,
     )
     if stats.new_accounts:
         logger.info("New accounts created: %s", ", ".join(stats.new_accounts))

@@ -1,6 +1,6 @@
 # PROGRESS.md — Finboard Build Tracker
 
-Last updated: 2026-06-19 (Session 13)
+Last updated: 2026-07-03 (Session 14)
 
 ---
 
@@ -255,6 +255,31 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_i
 ---
 
 ## Session Log
+
+### Session 14 — Ingest DB-path bug + uncategorised backlog fix (2026-07-03)
+Triggered by an `/import` failure (`no such table: category_rules`) and a huge Uncategorised
+spike (June 2026: 168 rows). Three distinct root causes found and fixed:
+1. **Wrong DB written by ingest** — `DB_PATH=../data/finance.db` is relative; the dashboard
+   resolves it against `dashboard/` (correct) but the spawned Python ran with `cwd=PROJECT_ROOT`,
+   resolving it one level too high and silently *creating* an empty DB (hence the missing table).
+   Fix: `app/import/actions.ts` now resolves an absolute `DB_PATH` and passes it in the child env.
+   Deleted the stray empty `/Users/sabs/projects/data/finance.db`.
+2. **`Unknown → Uncategorised` merchant rule** — `Unknown` is Frollo's "no merchant" placeholder,
+   but stored as a top-priority merchant rule it shadowed every description rule (e.g.
+   `atm → Money Transfers`) for raw ATM/transfer/interest entries. Deleted the rule; added a
+   `PLACEHOLDER_MERCHANTS` guard in `resolve_category` so it can't recur.
+3. **Insert-only categorisation** — `INSERT OR IGNORE` dropped duplicates *and* their freshly
+   resolved category, so re-running ingest never re-categorised existing rows. Ingest now
+   back-fills the category on a duplicate when the existing row is still Uncategorised (and
+   unflagged); new log field `recategorised: N`.
+- Also consolidated a duplicate `Uncategorised > Uncategorised` category (id 73 → 14, id 73 deleted).
+- New `scripts/recategorise.py` — bulk re-applies current rules to existing transactions
+  (default: Uncategorised only; `--all`; `--dry-run`; idempotent).
+- New dashboard button on `/rules` ("Re-apply rules to Uncategorised") → `app/rules/actions.ts`
+  spawns `recategorise.py` (same absolute-`DB_PATH` pattern) + `components/rules/RecategoriseButton.tsx`.
+- **Result: Uncategorised 346 → 45** (June 168 → 15). Remaining 45 are genuine (one-off payments,
+  `NOTPROVIDED`, and the 3 merchant rules deliberately kept mapped to Uncategorised).
+- **Next session**: still **R2.1** (CC-payment correctness fix) per Session 13 plan.
 
 ### Session 13 — R2.7 backlog review + planning (2026-06-19)
 No code this session — shipped Round 2 (Sessions 11–12) is committed + pushed (`6c189bb`).
@@ -518,6 +543,9 @@ See **`REVIEW_PLAN.md`** for the full post-review action checklist — **Round 2
 | 8 | CSV-based category review workflow | 3 | Export → user edits in Numbers/Excel → re-import. Repeatable for ongoing cleanup |
 | 9 | Category rules in SQLite (`category_rules`), not JSON | 8 | Single source of truth shared by dashboard + ingest. Dashboard creates rules + applies live; ingest reads the table. JSON files retired (kept as backup) |
 | 10 | CSV import + categorisation done in-dashboard | 8 | Upload triggers the existing Python ingest via a server action; rules created/edited live. Replaces the CSV export/edit/re-import loop for ongoing use |
+| 11 | Ingest re-categorises Uncategorised duplicates; separate `recategorise.py` | 14 | Rules added after a transaction was first ingested never reached it (`INSERT OR IGNORE` is insert-only). Ingest now back-fills Uncategorised duplicates; a standalone script + `/rules` button re-applies rules on demand |
+| 12 | Absolute `DB_PATH` passed to spawned scripts | 14 | Relative `DB_PATH` resolves against the spawn cwd; dashboard (`dashboard/`) and scripts (`PROJECT_ROOT`) differ, so a relative path silently created an empty DB. Server actions now pass an absolute path |
+| 13 | `Unknown` treated as "no merchant" in resolution | 14 | Frollo's `Unknown` placeholder as a merchant rule shadowed description rules for raw bank entries; `resolve_category` now ignores placeholder merchants |
 
 ---
 
