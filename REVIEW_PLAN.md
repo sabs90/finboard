@@ -19,7 +19,24 @@ spending analytics are strong; the gaps are (a) a correctness bug inflating spen
 duplicated drill-down route, and (c) the signature features the leaders headline — recurring
 detection, a cash-flow flow-viz, and proactive insights. Ordered by leverage.
 
-## R2.1 🔴 Fix: credit-card payments counted as spending (correctness)
+## R2.1 ✅ CLOSED — NO CHANGE (Session 15): premise disproven on re-verification
+
+**Re-verified 2026-07-06 before implementing, and the double-count claim does not hold.**
+Only four accounts have transaction feeds (HSBC Everyday, ANZ One Offset, Residential
+Investment Loan, AMP Mortgage Offset). **None of the credit cards being paid (Citibank,
+Virgin Money, Mycard) are linked**, so their purchases never appear in the data — the BPAY
+payment is the *only* record of that spending. Likewise the 15 "PayPal Pay In 4" rows are
+BNPL instalments whose underlying purchase never hits a linked account. Flipping these 19
+txns ($7,268) to `is_transfer = 1` would make real consumption vanish and *overstate* the
+savings rate — the opposite of the intent. This matches how Monarch/Copilot treat payments
+to **unlinked** cards: count the payment as the expense.
+
+**Decision: keep `is_transfer = 0` on `Financial → Credit Card Payments`.** Revisit only if
+a credit-card account feed is ever ingested (then payments become transfers and purchases
+become the spend). Audit of other internal flows: `Financial → Investments` is dividends
+(income, fine); `Transfers → Money Transfers` correctly flagged (414 rows, all transfers).
+
+<details><summary>Original (superseded) plan</summary>
 
 **Problem (verified against live DB):** the `Financial → Credit Card Payments` child has
 **$7,268 across 19 txns with `is_transfer = 0`**. Paying a card is an internal transfer, not
@@ -42,6 +59,8 @@ inflating spend and understating savings rate. `v_monthly_spend` includes every
   - confirm `Transfers → Money Transfers` is still correctly flagged.
 - [ ] Re-check: savings rate on `/` and `/cashflow` should rise once CC payments drop out.
 - [ ] Verify: `SELECT SUM(...) FROM v_monthly_spend` no longer contains the CC-payment rows.
+
+</details>
 
 ## R2.2 🔴 Collapse the duplicated drill-down route (IA + maintenance) ✅ DONE (Session 12)
 
@@ -120,14 +139,21 @@ currently ships bars + a table only. The flow viz is Copilot's signature.
 Captured so they aren't lost; each is its own piece of work:
 - [ ] **Non-monthly / sinking-fund budgeting** — spread annual/quarterly bills (rates, rego,
   strata, insurance — all present in the data) across months instead of flat monthly budgets.
-- [ ] **Savings goals + FIRE number** — target line on the net-worth chart + progress card.
-- [ ] **Net-worth milestone markers** — README specced them ("granny flat complete", "Zeekr
-  delivered"); annotate the history chart.
-- [ ] **Net-worth forecast** — project the trend forward at the current savings rate.
+- [x] **Savings goals + FIRE number** ✅ (Session 15) — singleton `net_worth_goal` table
+  (lazy-created + in db_init), `GoalPanel` on /networth (progress bar, % / $-to-go, projected
+  date, edit/remove), goal line on the new Trajectory & Forecast chart.
+- [x] **Net-worth milestone markers** ✅ (Session 15) — `net_worth_milestones` table, add/delete
+  UI in `GoalPanel`, markers snapped to the nearest quarter on the forecast chart.
+- [x] **Net-worth forecast** ✅ (Session 15) — `getNetWorthForecast()` projects the trailing-year
+  avg quarterly growth forward (extends until the goal crossing, capped at 40 quarters); dashed
+  projection on `NetWorthForecastChart` + projected-date callout in the goal panel.
 - [ ] **Investment holdings detail** — depends on Sharesight (Phase 2e, deferred).
-- [ ] **KPI sparklines** — mini trend inside each KPI card (Copilot-style); series already computed.
-- [ ] **Standardise income/expense colour** — one semantic system (inflow / neutral-outflow /
-  over-budget-warning); today cashflow uses orange, `<Amount>` neutral, deep-dive rose.
+- [x] **KPI sparklines** ✅ (Session 15) — pure-SVG `Sparkline` in `KpiCard` (server-rendered, no
+  client JS); Overview spend/income/savings-rate (last 6 *full* months), Cashflow KPIs (12 mo),
+  Net Worth KPI (8 quarters).
+- [x] **Standardise income/expense colour** ✅ (Session 15) — `SEMANTIC` palette in
+  `chartColors.ts` (income emerald / expense rose / net blue / debt rose / warning amber);
+  cashflow chart + table orange → rose; NetWorthHistoryChart hexes → semantic tokens.
 
 ---
 

@@ -1894,3 +1894,150 @@ export function getPivotData(months: number): PivotRow[] {
     ORDER BY COALESCE(pc.sort_order, c.sort_order, 999), COALESCE(pc.name, c.name), c.sort_order, c.name, month
   `).all(months) as PivotRow[];
 }
+
+// ── Net-worth goal, forecast & milestones ────────────────────────────────────
+
+/** Goal + milestone tables are created lazily (same pattern as
+ * recurring_dismissals) so the live DB doesn't require a db_init re-run. */
+function ensureGoalTables(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS net_worth_goal (
+      id            INTEGER PRIMARY KEY CHECK (id = 1),
+      label         TEXT NOT NULL DEFAULT 'Net worth goal',
+      target_cents  INTEGER NOT NULL,
+      updated_at    INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS net_worth_milestones (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      milestone_date  TEXT NOT NULL,
+      label           TEXT NOT NULL,
+      created_at      INTEGER NOT NULL
+    );
+  `);
+}
+
+export interface NetWorthGoal {
+  label: string;
+  target_cents: number;
+}
+
+export function getNetWorthGoal(): NetWorthGoal | null {
+  const db = getDb();
+  ensureGoalTables(db);
+  const row = db.prepare(`SELECT label, target_cents FROM net_worth_goal WHERE id = 1`).get() as NetWorthGoal | undefined;
+  return row ?? null;
+}
+
+/** Upsert the (single) net-worth goal. A target of 0 or less clears it. */
+export function setNetWorthGoal(targetCents: number, label: string): void {
+  const db = getDb();
+  ensureGoalTables(db);
+  if (targetCents <= 0) {
+    db.prepare(`DELETE FROM net_worth_goal WHERE id = 1`).run();
+    return;
+  }
+  db.prepare(`
+    INSERT INTO net_worth_goal (id, label, target_cents, updated_at)
+    VALUES (1, ?, ?, unixepoch())
+    ON CONFLICT(id) DO UPDATE SET label = excluded.label, target_cents = excluded.target_cents, updated_at = excluded.updated_at
+  `).run(label, targetCents);
+}
+
+export interface MilestoneRow {
+  id: number;
+  milestone_date: string;
+  label: string;
+}
+
+export function getMilestones(): MilestoneRow[] {
+  const db = getDb();
+  ensureGoalTables(db);
+  return db.prepare(`
+    SELECT id, milestone_date, label FROM net_worth_milestones ORDER BY milestone_date
+  `).all() as MilestoneRow[];
+}
+
+export function addMilestone(date: string, label: string): void {
+  const db = getDb();
+  ensureGoalTables(db);
+  db.prepare(`
+    INSERT INTO net_worth_milestones (milestone_date, label, created_at) VALUES (?, ?, unixepoch())
+  `).run(date, label);
+}
+
+export function deleteMilestone(id: number): void {
+  const db = getDb();
+  ensureGoalTables(db);
+  db.prepare(`DELETE FROM net_worth_milestones WHERE id = ?`).run(id);
+}
+
+/** Add n quarters to an ISO date, snapping to the end of the target month. */
+function addQuartersEom(isoDate: string, n: number): string {
+  const [y, m] = isoDate.split('-').map(Number);
+  const total = y * 12 + (m - 1) + n * 3;
+  const year = Math.floor(total / 12);
+  const month = (total % 12) + 1;
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+}
+
+export interface ForecastPoint {
+  date: string;
+  net_worth_cents: number | null; // history line
+  forecast_cents: number | null;  // dashed projection line
+}
+
+export interface NetWorthForecast {
+  points: ForecastPoint[];
+  /** Average net-worth change per quarter over the trailing year. */
+  quarterlyGrowthCents: number;
+  /** Quarter-end when the trend line crosses the goal target (null if no goal,
+   * already reached, or the trend is flat/negative). */
+  projectedDate: string | null;
+}
+
+/**
+ * Net-worth history plus a straight-line projection at the average quarterly
+ * growth of the trailing 4 quarters. Projects at least `minQuartersAhead`
+ * quarters, extending (capped at 40) until the goal target is crossed so the
+ * chart always shows the crossing point when one exists.
+ */
+export function getNetWorthForecast(minQuartersAhead = 8): NetWorthForecast {
+  const history = getNetWorthHistory();
+  const goal = getNetWorthGoal();
+
+  if (history.length === 0) {
+    return { points: [], quarterlyGrowthCents: 0, projectedDate: null };
+  }
+
+  const last = history[history.length - 1];
+  const lookback = Math.min(4, history.length - 1);
+  const quarterlyGrowthCents = lookback > 0
+    ? Math.round((last.net_worth_cents - history[history.length - 1 - lookback].net_worth_cents) / lookback)
+    : 0;
+
+  let projectedDate: string | null = null;
+  let quarters = minQuartersAhead;
+  if (goal && quarterlyGrowthCents > 0 && goal.target_cents > last.net_worth_cents) {
+    const needed = Math.ceil((goal.target_cents - last.net_worth_cents) / quarterlyGrowthCents);
+    projectedDate = addQuartersEom(last.snapshot_date, needed);
+    quarters = Math.min(Math.max(minQuartersAhead, needed + 2), 40);
+  }
+
+  const points: ForecastPoint[] = history.map((h) => ({
+    date: h.snapshot_date,
+    net_worth_cents: h.net_worth_cents,
+    forecast_cents: null,
+  }));
+  // Anchor the dashed line to the last actual so the two lines connect.
+  points[points.length - 1].forecast_cents = last.net_worth_cents;
+  for (let i = 1; i <= quarters; i++) {
+    points.push({
+      date: addQuartersEom(last.snapshot_date, i),
+      net_worth_cents: null,
+      forecast_cents: last.net_worth_cents + quarterlyGrowthCents * i,
+    });
+  }
+
+  return { points, quarterlyGrowthCents, projectedDate };
+}

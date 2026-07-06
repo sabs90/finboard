@@ -204,6 +204,24 @@ CREATE TABLE IF NOT EXISTS recurring_dismissals (
     created_at      INTEGER NOT NULL
 );
 
+-- Singleton net-worth goal (the dashboard's flexible target: FIRE number, a
+-- round net-worth figure, etc.). One row max, id fixed at 1.
+CREATE TABLE IF NOT EXISTS net_worth_goal (
+    id              INTEGER PRIMARY KEY CHECK (id = 1),
+    label           TEXT NOT NULL DEFAULT 'Net worth goal',
+    target_cents    INTEGER NOT NULL,
+    updated_at      INTEGER NOT NULL
+);
+
+-- Life/finance milestones annotated on the net-worth history chart
+-- (e.g. "granny flat complete", "Zeekr delivered").
+CREATE TABLE IF NOT EXISTS net_worth_milestones (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    milestone_date  TEXT NOT NULL,      -- YYYY-MM-DD
+    label           TEXT NOT NULL,
+    created_at      INTEGER NOT NULL
+);
+
 -- ── views ─────────────────────────────────────────────────────────────────────
 DROP VIEW IF EXISTS v_monthly_spend;
 CREATE VIEW v_monthly_spend AS

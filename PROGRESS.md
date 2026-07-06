@@ -1,6 +1,6 @@
 # PROGRESS.md — Finboard Build Tracker
 
-Last updated: 2026-07-03 (Session 14)
+Last updated: 2026-07-06 (Session 15)
 
 ---
 
@@ -255,6 +255,40 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_i
 ---
 
 ## Session Log
+
+### Session 15 — R2.1 closed (no change) + goal/forecast bundle + quick wins (2026-07-06)
+Review-and-implement session benchmarked against Copilot/Monarch/Kubera aesthetics + features.
+- **R2.1 closed with NO data change — the Session-10 premise was wrong.** Re-verified before
+  implementing: transaction feeds exist for only 4 accounts (HSBC Everyday, ANZ Offset,
+  Investment Loan, AMP Offset); the credit cards being paid (Citi, Virgin, Mycard) are *not*
+  linked, so the BPAY payments are the only record of that spending — flipping them to
+  `is_transfer = 1` would delete $7,268 of real consumption and overstate the savings rate.
+  Same logic for the 15 PayPal Pay-in-4 BNPL instalments. Matches Monarch/Copilot treatment of
+  unlinked cards. Revisit only if a card feed is ever ingested. Known Issues + R2.1 updated.
+- **Goal / forecast / milestones bundle (R2.7 #2+#3+#4)** on `/networth`:
+  - New tables `net_worth_goal` (singleton) + `net_worth_milestones` — lazy-created in
+    `lib/db.ts` (recurring_dismissals pattern) and added to `scripts/db_init.py`.
+  - `getNetWorthForecast()` — straight-line projection at trailing-4-quarter avg growth,
+    extended to the goal crossing (cap 40 quarters); returns projected achievement date.
+  - `GoalPanel` (progress bar, %, $-to-go, projected date, edit/remove goal, add/delete
+    milestones) + `NetWorthForecastChart` (solid actual, dashed forecast, amber goal line,
+    projected-date marker, milestone dots snapped to nearest quarter). Server actions in
+    `app/networth/actions.ts`. Verified round-trip on live data (insert goal → renders → remove).
+- **KPI sparklines (R2.7 #6)**: pure-SVG `components/ui/Sparkline.tsx` (server-rendered, zero
+  client JS) + `spark` prop on `KpiCard`. Overview (spend/income/savings-rate, last 6 *full*
+  months — partial current month excluded so it doesn't read as a dip), Cashflow (12 mo),
+  Net Worth (8 quarters).
+- **Semantic colour system (R2.7 #7)**: `SEMANTIC` in `lib/chartColors.ts` — income emerald,
+  expense rose, net/assets blue, debt rose, warning amber. Cashflow chart expense bar + table
+  column orange → rose; NetWorthHistoryChart hardcoded hexes → tokens.
+- Verified: typecheck clean; all 10 display routes 200 on a fresh dev server.
+- **Data-quality flag for Sabs**: `net_worth_snapshots` has a row dated **2026-09-30 (future)**
+  identical to 2026-06-30 — likely an accidental /balance-input save; it shifts "as at" labels
+  and flattens the forecast trend. Also 2026-03-31 NW dips ~$200k vs 2025-12-31 (possibly the
+  Yarran refi top-up adding debt before the matching asset update). Not auto-deleted (no-delete
+  rule) — review and clean up via SQL if unintended.
+- **Next**: sinking-fund budgeting (R2.7 #1) is the last non-blocked R2.7 item; Docker deploy
+  (Phase 3) still outstanding.
 
 ### Session 14 — Ingest DB-path bug + uncategorised backlog fix (2026-07-03)
 Triggered by an `/import` failure (`no such table: category_rules`) and a huge Uncategorised
@@ -518,10 +552,13 @@ Executed REVIEW_PLAN.md Round 2 R2.3 → R2.4 → R2.5 (skipped R2.1/R2.2 at use
 
 ## Known Issues / Blockers
 
-- 🔴 **Credit-card payments counted as spending** (found Session 10): `Financial → Credit Card
-  Payments` rows have `is_transfer = 0`, so card repayments ($7,268 / 19 txns) leak into
-  `v_monthly_spend`, double-counting against recorded purchases and understating savings rate.
-  Fix = REVIEW_PLAN R2.1 (backfill `is_transfer = 1` + map the Frollo category as a transfer).
+- ~~**Credit-card payments counted as spending**~~ — **closed Session 15, no change needed.**
+  Re-verification showed the Session-10 double-count premise was wrong: no credit-card account
+  is linked (feeds exist only for HSBC Everyday, ANZ Offset, Investment Loan, AMP Offset), so
+  card purchases never appear in the data — the BPAY payment is the *only* record of that
+  spending. Marking the 19 txns ($7,268) as transfers would delete real consumption and
+  overstate the savings rate. Correct treatment (matches Monarch/Copilot for unlinked cards):
+  keep `is_transfer = 0`. Revisit only if a card feed is ever ingested. See REVIEW_PLAN R2.1.
 - ~~**Dead nav links**: `/budget` and `/cashflow` 404~~ — resolved Session 8 (both pages built).
 - ~~**Bad net-worth quarter**: 2025-09-30 showed ~ -$1.05M~~ — resolved; now +$1.02M after source spreadsheet was completed and ingest re-run.
 

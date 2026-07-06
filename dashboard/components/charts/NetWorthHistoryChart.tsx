@@ -4,6 +4,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
 } from 'recharts';
+import { SEMANTIC } from '@/lib/chartColors';
 
 interface DataPoint {
   date: string;
@@ -77,7 +78,7 @@ export function NetWorthHistoryChart({ data }: { data: DataPoint[] }) {
           <Line
             type="monotone"
             dataKey="total_assets"
-            stroke="#3B82F6"
+            stroke={SEMANTIC.assets}
             strokeWidth={1.5}
             dot={false}
             strokeOpacity={0.5}
@@ -85,7 +86,7 @@ export function NetWorthHistoryChart({ data }: { data: DataPoint[] }) {
           <Line
             type="monotone"
             dataKey="mortgage"
-            stroke="#EF4444"
+            stroke={SEMANTIC.debt}
             strokeWidth={1.5}
             dot={false}
             strokeOpacity={0.5}
@@ -93,7 +94,7 @@ export function NetWorthHistoryChart({ data }: { data: DataPoint[] }) {
           <Line
             type="monotone"
             dataKey="net_worth"
-            stroke="#10B981"
+            stroke={SEMANTIC.income}
             strokeWidth={2.5}
             dot={false}
           />
@@ -101,9 +102,9 @@ export function NetWorthHistoryChart({ data }: { data: DataPoint[] }) {
       </ResponsiveContainer>
       <div className="flex gap-6 justify-center mt-2">
         {[
-          { color: '#10B981', label: 'Net Worth' },
-          { color: '#3B82F6', label: 'Total Assets' },
-          { color: '#EF4444', label: 'Mortgage' },
+          { color: SEMANTIC.income, label: 'Net Worth' },
+          { color: SEMANTIC.assets, label: 'Total Assets' },
+          { color: SEMANTIC.debt, label: 'Mortgage' },
         ].map(({ color, label }) => (
           <div key={label} className="flex items-center gap-1.5 text-xs text-slate-400">
             <div className="w-3 h-0.5 rounded" style={{ backgroundColor: color }} />

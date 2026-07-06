@@ -4,6 +4,7 @@ import {
   BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip,
 } from 'recharts';
 import { formatCurrency } from '@/lib/formatters';
+import { SEMANTIC } from '@/lib/chartColors';
 
 export interface WaterfallCategory {
   name: string;
@@ -26,9 +27,9 @@ interface Step {
   kind: 'income' | 'expense' | 'net';
 }
 
-const INCOME_COLOR = '#10B981';
-const NET_POS_COLOR = '#3B82F6';
-const NET_NEG_COLOR = '#F43F5E';
+const INCOME_COLOR = SEMANTIC.income;
+const NET_POS_COLOR = SEMANTIC.net;
+const NET_NEG_COLOR = SEMANTIC.expense;
 
 function buildSteps({ incomeCents, categories, netCents }: WaterfallProps): Step[] {
   const steps: Step[] = [

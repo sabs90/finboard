@@ -1,3 +1,16 @@
+// Semantic money colours — the single source of truth for flow direction.
+// Inflows are emerald, outflows rose, net/neutral blue, debt rose, warnings
+// amber. Charts and tables must use these (not ad-hoc hexes) so income/expense
+// reads the same everywhere.
+export const SEMANTIC = {
+  income: '#10B981',   // emerald-500
+  expense: '#F43F5E',  // rose-500
+  net: '#3B82F6',      // blue-500
+  assets: '#3B82F6',   // blue-500
+  debt: '#F43F5E',     // rose-500
+  warning: '#F59E0B',  // amber-500
+} as const;
+
 // Canonical category-colour fallback. The DB `categories.colour` column is the
 // primary source (joined into queries via COALESCE(pc.colour, c.colour)); this
 // map and the subcategory palette below cover cases where the DB has no colour.

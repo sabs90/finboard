@@ -1,4 +1,4 @@
-import { getNetWorthHistory, getLatestNetWorthSnapshot } from '@/lib/db';
+import { getNetWorthHistory, getLatestNetWorthSnapshot, getNetWorthGoal, getNetWorthForecast, getMilestones } from '@/lib/db';
 import { formatDollars } from '@/lib/formatters';
 import Link from 'next/link';
 import { KpiCard } from '@/components/ui/KpiCard';
@@ -6,11 +6,17 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
 import { NetWorthStackedChart } from '@/components/charts/NetWorthStackedChart';
 import type { NetWorthStackedPoint } from '@/components/charts/NetWorthStackedChart';
 import { NetWorthHistoryChart } from '@/components/charts/NetWorthHistoryChart';
+import { NetWorthForecastChart } from '@/components/charts/NetWorthForecastChart';
+import { GoalPanel } from '@/components/networth/GoalPanel';
 import { CollapsibleCard } from '@/components/ui/CollapsibleCard';
+import { SEMANTIC } from '@/lib/chartColors';
 
 export default function NetWorthPage() {
   const snap = getLatestNetWorthSnapshot();
   const history = getNetWorthHistory();
+  const goal = getNetWorthGoal();
+  const forecast = getNetWorthForecast();
+  const milestones = getMilestones();
 
   if (!snap) {
     return (
@@ -58,6 +64,7 @@ export default function NetWorthPage() {
         <KpiCard
           label="Net Worth"
           value={formatDollars(snap.net_worth_cents)}
+          spark={{ values: history.slice(-8).map((h) => h.net_worth_cents), color: SEMANTIC.income }}
           trend={qoqChange !== null ? {
             value: `${formatDollars(Math.abs(qoqChange))} vs last quarter`,
             positive: qoqChange >= 0,
@@ -100,6 +107,31 @@ export default function NetWorthPage() {
           )}
         </div>
       )}
+
+      {/* ── Goal progress + management ────────────────────────────────── */}
+      <GoalPanel
+        goal={goal}
+        currentCents={snap.net_worth_cents}
+        quarterlyGrowthCents={forecast.quarterlyGrowthCents}
+        projectedDate={forecast.projectedDate}
+        milestones={milestones}
+      />
+
+      {/* ── History + forecast (goal line, milestone markers) ─────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Trajectory &amp; Forecast</CardTitle>
+        </CardHeader>
+        <div className="px-6 pb-6">
+          <NetWorthForecastChart
+            points={forecast.points}
+            targetCents={goal?.target_cents ?? null}
+            targetLabel={goal?.label}
+            projectedDate={forecast.projectedDate}
+            milestones={milestones}
+          />
+        </div>
+      </Card>
 
       {/* ── Wealth composition (stacked area) ─────────────────────────── */}
       <Card>

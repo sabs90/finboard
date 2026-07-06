@@ -1,4 +1,4 @@
-import { getOverviewKpis, getCategoryBreakdown, getMonthlyTotals, getRecentTransactions, getLatestNetWorthSnapshot, getSpendIncomeUpToDay, getUpcomingBillsCount, getInsights } from '@/lib/db';
+import { getOverviewKpis, getCategoryBreakdown, getMonthlyTotals, getRecentTransactions, getLatestNetWorthSnapshot, getSpendIncomeUpToDay, getUpcomingBillsCount, getInsights, getCashflow } from '@/lib/db';
 import { getCurrentMonth, formatCurrency, formatDollars, formatDate, formatMonth, prevMonth } from '@/lib/formatters';
 import Link from 'next/link';
 import { KpiCard } from '@/components/ui/KpiCard';
@@ -7,7 +7,7 @@ import { Amount } from '@/components/ui/Amount';
 import { SpendingDonut } from '@/components/charts/SpendingDonut';
 import { MonthlyBarChart } from '@/components/charts/MonthlyBarChart';
 import { InsightsPanel } from '@/components/overview/InsightsPanel';
-import { getCategoryColor } from '@/lib/chartColors';
+import { getCategoryColor, SEMANTIC } from '@/lib/chartColors';
 
 function prepareDonutData(rows: { parent_category: string; category_id: number | null; colour: string; total_cents: number }[]) {
   const top = rows.slice(0, 8);
@@ -63,6 +63,15 @@ export default function OverviewPage() {
   const lastSavingsRate = lastIncome > 0 ? Math.round((lastSavings / lastIncome) * 100) : null;
   const savingsRateDelta = lastSavingsRate !== null ? savingsRate - lastSavingsRate : null;
 
+  // ── KPI sparklines — last 6 *full* months (the partial current month would
+  //    read as a false dip) ────────────────────────────────────────────────────
+  const sparkMonths = getCashflow(7).filter((r) => r.month < month).slice(-6);
+  const spendSpark = sparkMonths.map((r) => r.expense_cents);
+  const incomeSpark = sparkMonths.map((r) => r.income_cents);
+  const savingsRateSpark = sparkMonths.map((r) =>
+    r.income_cents > 0 ? (r.net_cents / r.income_cents) * 100 : 0,
+  );
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -108,6 +117,7 @@ export default function OverviewPage() {
           label="Spent this month"
           value={formatCurrency(thisSpend)}
           subtitle="Month to date"
+          spark={{ values: spendSpark, color: SEMANTIC.expense }}
           trend={spendPct !== null ? {
             value: `${Math.abs(spendPct)}% vs last month`,
             positive: thisSpend <= lastSpend,
@@ -118,6 +128,7 @@ export default function OverviewPage() {
           label="Income"
           value={formatCurrency(thisIncome)}
           subtitle="Month to date"
+          spark={{ values: incomeSpark, color: SEMANTIC.income }}
           trend={incomePct !== null ? {
             value: `${Math.abs(incomePct)}% vs last month`,
             positive: thisIncome >= lastIncome,
@@ -128,6 +139,7 @@ export default function OverviewPage() {
           label="Savings rate"
           value={`${savingsRate}%`}
           subtitle={formatCurrency(savings)}
+          spark={{ values: savingsRateSpark, color: SEMANTIC.net }}
           trend={savingsRateDelta !== null ? {
             value: `${savingsRateDelta >= 0 ? '+' : ''}${savingsRateDelta}pp vs last month`,
             positive: savingsRateDelta >= 0,

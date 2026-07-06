@@ -4,6 +4,7 @@ import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend,
 } from 'recharts';
 import { formatCurrency, formatMonth } from '@/lib/formatters';
+import { SEMANTIC } from '@/lib/chartColors';
 
 export interface CashflowPoint {
   month: string;
@@ -69,9 +70,9 @@ export function CashflowChart({ data }: { data: CashflowPoint[] }) {
             iconType="circle"
             wrapperStyle={{ fontSize: 12, color: '#94a3b8', paddingTop: 8 }}
           />
-          <Bar name="Income" dataKey="income" fill="#10B981" radius={[4, 4, 0, 0]} />
-          <Bar name="Expenses" dataKey="expense" fill="#F97316" radius={[4, 4, 0, 0]} />
-          <Line name="Net" type="monotone" dataKey="net" stroke="#3B82F6" strokeWidth={2} dot={{ r: 3, fill: '#3B82F6' }} />
+          <Bar name="Income" dataKey="income" fill={SEMANTIC.income} radius={[4, 4, 0, 0]} />
+          <Bar name="Expenses" dataKey="expense" fill={SEMANTIC.expense} radius={[4, 4, 0, 0]} />
+          <Line name="Net" type="monotone" dataKey="net" stroke={SEMANTIC.net} strokeWidth={2} dot={{ r: 3, fill: SEMANTIC.net }} />
         </ComposedChart>
       </ResponsiveContainer>
     </div>

@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { CashflowChart } from '@/components/charts/CashflowChart';
 import { CashflowWaterfall, type WaterfallCategory } from '@/components/charts/CashflowWaterfall';
 import { MonthNav } from '@/components/spending/MonthNav';
+import { SEMANTIC } from '@/lib/chartColors';
 
 const MONTHS = 12;
 
@@ -62,9 +63,21 @@ export default function CashflowPage({
       {hasMonthData ? (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <KpiCard label={`Income — ${formatMonth(month)}`} value={formatCurrency(breakdown.incomeCents)} />
-            <KpiCard label="Expenses" value={formatCurrency(breakdown.expenseCents)} />
-            <KpiCard label="Net Savings" value={formatCurrency(breakdown.netCents)} />
+            <KpiCard
+              label={`Income — ${formatMonth(month)}`}
+              value={formatCurrency(breakdown.incomeCents)}
+              spark={{ values: rows.map((r) => r.income_cents), color: SEMANTIC.income }}
+            />
+            <KpiCard
+              label="Expenses"
+              value={formatCurrency(breakdown.expenseCents)}
+              spark={{ values: rows.map((r) => r.expense_cents), color: SEMANTIC.expense }}
+            />
+            <KpiCard
+              label="Net Savings"
+              value={formatCurrency(breakdown.netCents)}
+              spark={{ values: rows.map((r) => r.net_cents), color: SEMANTIC.net }}
+            />
             <KpiCard label="Savings Rate" value={savingsRate !== null ? `${savingsRate}%` : '—'} />
           </div>
 
@@ -121,7 +134,7 @@ export default function CashflowPage({
                       <tr key={r.month} className="hover:bg-slate-800/50 transition-colors">
                         <td className="px-6 py-3 text-slate-100 whitespace-nowrap">{formatMonth(r.month)}</td>
                         <td className="px-6 py-3 text-right tabular-nums text-emerald-400">{formatCurrency(r.income_cents)}</td>
-                        <td className="px-6 py-3 text-right tabular-nums text-orange-400">{formatCurrency(r.expense_cents)}</td>
+                        <td className="px-6 py-3 text-right tabular-nums text-rose-400">{formatCurrency(r.expense_cents)}</td>
                         <td className={`px-6 py-3 text-right tabular-nums font-medium ${r.net_cents >= 0 ? 'text-slate-100' : 'text-rose-400'}`}>
                           {formatCurrency(r.net_cents)}
                         </td>
