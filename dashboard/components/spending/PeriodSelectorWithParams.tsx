@@ -12,7 +12,8 @@ const PERIODS = [
 export function PeriodSelectorWithParams({ baseParts }: { baseParts: string[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const current = searchParams.get('period') ?? '1';
+  // Keep in sync with the page's default period (3 months).
+  const current = searchParams.get('period') ?? '3';
 
   return (
     <div className="flex bg-slate-800 rounded-lg p-0.5 border border-slate-700">

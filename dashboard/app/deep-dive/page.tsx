@@ -92,7 +92,9 @@ export default function DeepDivePage({
   if (!category) return redirect('/deep-dive');
 
   const isParent = category.parent_id === null;
-  const periodMonths = Math.max(1, Math.min(12, parseInt(searchParams.period ?? '1', 10) || 1));
+  // Default to 3 months — "This Month" is usually part-way through and reads
+  // as a misleadingly low (often $0) figure.
+  const periodMonths = Math.max(1, Math.min(12, parseInt(searchParams.period ?? '3', 10) || 3));
   const { startDate, endDate } = getDateRange(periodMonths);
   const currentMonth = getCurrentMonth();
   const lastMonth = prevMonth(currentMonth);
