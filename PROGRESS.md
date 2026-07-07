@@ -1,6 +1,6 @@
 # PROGRESS.md — Finboard Build Tracker
 
-Last updated: 2026-07-06 (Session 15)
+Last updated: 2026-07-08 (Session 16)
 
 ---
 
@@ -255,6 +255,34 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_i
 ---
 
 ## Session Log
+
+### Session 16 — PPOR mortgage page + overview net-loan line (2026-07-08)
+User request: PPOR mortgage on Overview (AMP loan net of AMP offset) + a dedicated /mortgage
+page with payoff/extra-repayment analysis. Benchmarked against AU mortgage calculators
+(Moneysmart-style extra-repayment/offset/lump-sum modelling).
+- **Data mapping (user-confirmed)**: the AMP loan = the "8 Yarran St" facilities in the balance
+  sheet (refinanced Jan 2026 — PEXA settlement in the AMP feed; old fixed $813,788 + variable
+  $222,979 → single $1,037,000 loan under the "(fixed)" row; variable now $0). Offset = the
+  "AMP" balance-sheet account ($58,995 at 2026-06-30). Repayments = the monthly
+  "Withdrawal Direct Debit" rows on the AMP Mortgage Offset feed.
+- **`mortgage_settings` singleton** (lazy-created + in db_init): loan_account_ids ('26,27'),
+  offset_account_id (9), annual_rate (seeded 0.0644 from latest facility rate),
+  monthly_repayment_cents (seeded $4,969.25 = median of recent direct debits). Label/rate/
+  repayment editable via the page's Loan settings panel (`app/mortgage/actions.ts`).
+- **`lib/mortgage.ts`** — pure amortisation model shared server/client: monthly interest on
+  (balance − offset), supports extra-monthly + lump-sum, 50-yr cap, handles interest-only
+  (repayment ≤ interest → paysOff=false).
+- **`/mortgage` page** (sidebar: Wealth): KPIs (loan / offset+$saved-per-yr / net / rate+
+  effective-rate-after-offset), repayment row (monthly repayment, interest vs principal split,
+  payoff date, interest remaining), offset-benefit card (incl. time saved vs no offset),
+  equity & LVR card (colour-banded bar, $1.6M valuation), loan-vs-offset history chart,
+  **Pay It Off Faster** interactive calculator (extra-$/mo chips + custom + lump sum → payoff
+  date, time saved, interest saved, baseline-vs-scenario projection chart).
+- **Overview hero**: "Home loan (net of offset) −$978,005" line in rose.
+- **Notable finding surfaced by the page**: current repayment (~$4,969/mo) < monthly interest
+  on net balance (~$5,249) → loan is effectively interest-only and never amortises at current
+  pace; page shows the amber callout. Consistent with the flat $1,037,000 balance.
+- Verified: settings seeded correctly on live DB; typecheck clean; all routes 200.
 
 ### Session 15 — R2.1 closed (no change) + goal/forecast bundle + quick wins (2026-07-06)
 Review-and-implement session benchmarked against Copilot/Monarch/Kubera aesthetics + features.

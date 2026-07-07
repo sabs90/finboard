@@ -1,4 +1,4 @@
-import { getOverviewKpis, getCategoryBreakdown, getMonthlyTotals, getRecentTransactions, getLatestNetWorthSnapshot, getSpendIncomeUpToDay, getUpcomingBillsCount, getInsights, getCashflow } from '@/lib/db';
+import { getOverviewKpis, getCategoryBreakdown, getMonthlyTotals, getRecentTransactions, getLatestNetWorthSnapshot, getSpendIncomeUpToDay, getUpcomingBillsCount, getInsights, getCashflow, getMortgageSummary } from '@/lib/db';
 import { getCurrentMonth, formatCurrency, formatDollars, formatDate, formatMonth, prevMonth } from '@/lib/formatters';
 import Link from 'next/link';
 import { KpiCard } from '@/components/ui/KpiCard';
@@ -36,6 +36,7 @@ export default function OverviewPage() {
   const monthlyTotals = getMonthlyTotals(6);
   const recentTransactions = getRecentTransactions(10);
   const netWorth = getLatestNetWorthSnapshot();
+  const mortgage = getMortgageSummary();
   const upcomingBills = getUpcomingBillsCount(14);
   const insights = getInsights(month);
 
@@ -106,6 +107,14 @@ export default function OverviewPage() {
                     </span>
                   </div>
                 ))}
+                {mortgage && (
+                  <div className="flex items-center gap-3 justify-end">
+                    <span className="text-xs text-slate-500">Home loan (net of offset)</span>
+                    <span className="text-sm tabular-nums text-rose-400 w-24 text-right">
+                      -{formatDollars(mortgage.netCents)}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

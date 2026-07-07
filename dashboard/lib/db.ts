@@ -2041,3 +2041,203 @@ export function getNetWorthForecast(minQuartersAhead = 8): NetWorthForecast {
 
   return { points, quarterlyGrowthCents, projectedDate };
 }
+
+// ── Mortgage (PPOR home loan + offset) ──────────────────────────────────────
+
+/**
+ * Singleton settings row describing the PPOR mortgage: which loan accounts
+ * make up the facility, which cash account offsets it, and the rate/repayment
+ * to use in projections. Created lazily and seeded from live data on first
+ * read: loan = the '8 Yarran St' mortgage facilities (refinanced to AMP,
+ * Jan 2026), offset = the 'AMP' balance-sheet account, rate = latest recorded
+ * facility rate, repayment = median of recent direct debits on the AMP feed.
+ * Rate / repayment / label are editable from the dashboard.
+ */
+function ensureMortgageSettings(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS mortgage_settings (
+      id                      INTEGER PRIMARY KEY CHECK (id = 1),
+      label                   TEXT NOT NULL DEFAULT 'Home Loan',
+      loan_account_ids        TEXT NOT NULL,     -- comma-separated accounts.id list
+      offset_account_id       INTEGER REFERENCES accounts(id),
+      annual_rate             REAL,              -- decimal, e.g. 0.0644
+      monthly_repayment_cents INTEGER,
+      updated_at              INTEGER NOT NULL
+    )
+  `);
+
+  const existing = db.prepare(`SELECT id FROM mortgage_settings WHERE id = 1`).get();
+  if (existing) return;
+
+  const loanIds = (db.prepare(`
+    SELECT id FROM accounts WHERE account_type = 'mortgage' AND name LIKE '8 Yarran St%' ORDER BY id
+  `).all() as { id: number }[]).map((r) => r.id);
+  if (loanIds.length === 0) return; // nothing to seed — no PPOR loan data yet
+
+  const offset = db.prepare(`SELECT id FROM accounts WHERE name = 'AMP' LIMIT 1`).get() as { id: number } | undefined;
+
+  const rate = db.prepare(`
+    SELECT interest_rate FROM loan_snapshots
+    WHERE account_id IN (${loanIds.map(() => '?').join(',')}) AND interest_rate IS NOT NULL AND outstanding_cents > 0
+    ORDER BY snapshot_date DESC LIMIT 1
+  `).get(...loanIds) as { interest_rate: number } | undefined;
+
+  // Recent mortgage direct debits from the AMP transaction feed.
+  const debits = db.prepare(`
+    SELECT ABS(t.amount_cents) AS cents
+    FROM transactions t
+    JOIN accounts a ON t.account_id = a.id
+    WHERE a.name = 'AMP Mortgage Offset'
+      AND t.amount_cents < 0
+      AND t.description LIKE '%Direct Debit%'
+    ORDER BY t.transaction_date DESC LIMIT 6
+  `).all() as { cents: number }[];
+  const repayment = debits.length > 0 ? median(debits.map((d) => d.cents)) : null;
+
+  db.prepare(`
+    INSERT INTO mortgage_settings (id, label, loan_account_ids, offset_account_id, annual_rate, monthly_repayment_cents, updated_at)
+    VALUES (1, 'AMP Home Loan', ?, ?, ?, ?, unixepoch())
+  `).run(loanIds.join(','), offset?.id ?? null, rate?.interest_rate ?? null, repayment);
+}
+
+export interface MortgageSettings {
+  label: string;
+  loan_account_ids: string;
+  offset_account_id: number | null;
+  annual_rate: number | null;
+  monthly_repayment_cents: number | null;
+}
+
+export function getMortgageSettings(): MortgageSettings | null {
+  const db = getDb();
+  ensureMortgageSettings(db);
+  const row = db.prepare(`
+    SELECT label, loan_account_ids, offset_account_id, annual_rate, monthly_repayment_cents
+    FROM mortgage_settings WHERE id = 1
+  `).get() as MortgageSettings | undefined;
+  return row ?? null;
+}
+
+export function updateMortgageSettings(annualRate: number | null, monthlyRepaymentCents: number | null, label: string): void {
+  const db = getDb();
+  ensureMortgageSettings(db);
+  db.prepare(`
+    UPDATE mortgage_settings
+    SET annual_rate = ?, monthly_repayment_cents = ?, label = ?, updated_at = unixepoch()
+    WHERE id = 1
+  `).run(annualRate, monthlyRepaymentCents, label);
+}
+
+export interface MortgageSummary {
+  label: string;
+  loanCents: number;
+  offsetCents: number;
+  netCents: number;
+  annualRate: number | null;
+  asOf: string;
+}
+
+/** Latest PPOR loan balance net of offset, for the Overview hero. */
+export function getMortgageSummary(): MortgageSummary | null {
+  const db = getDb();
+  const settings = getMortgageSettings();
+  if (!settings) return null;
+  const loanIds = settings.loan_account_ids.split(',').map(Number).filter((n) => Number.isFinite(n));
+  if (loanIds.length === 0) return null;
+
+  // Latest snapshot per facility (facilities can stop reporting, e.g. a
+  // closed variable split — its latest value of 0 still counts correctly).
+  const loans = db.prepare(`
+    SELECT ls.outstanding_cents AS cents, ls.snapshot_date AS date
+    FROM loan_snapshots ls
+    JOIN (
+      SELECT account_id, MAX(snapshot_date) AS max_date FROM loan_snapshots
+      WHERE account_id IN (${loanIds.map(() => '?').join(',')})
+      GROUP BY account_id
+    ) latest ON ls.account_id = latest.account_id AND ls.snapshot_date = latest.max_date
+  `).all(...loanIds) as { cents: number; date: string }[];
+  if (loans.length === 0) return null;
+
+  const loanCents = loans.reduce((s, l) => s + l.cents, 0);
+  const asOf = loans.reduce((max, l) => (l.date > max ? l.date : max), loans[0].date);
+
+  let offsetCents = 0;
+  if (settings.offset_account_id !== null) {
+    const row = db.prepare(`
+      SELECT balance_cents FROM account_balances
+      WHERE account_id = ? ORDER BY balance_date DESC LIMIT 1
+    `).get(settings.offset_account_id) as { balance_cents: number } | undefined;
+    offsetCents = row?.balance_cents ?? 0;
+  }
+
+  return {
+    label: settings.label,
+    loanCents,
+    offsetCents,
+    netCents: loanCents - offsetCents,
+    annualRate: settings.annual_rate,
+    asOf,
+  };
+}
+
+export interface MortgageHistoryPoint {
+  date: string;
+  loanCents: number;
+  offsetCents: number | null;
+}
+
+export interface MortgageData {
+  settings: MortgageSettings;
+  summary: MortgageSummary;
+  history: MortgageHistoryPoint[];
+  propertyName: string | null;
+  propertyValueCents: number | null;
+}
+
+/** Everything the /mortgage page needs, or null when no loan data exists. */
+export function getMortgageData(): MortgageData | null {
+  const db = getDb();
+  const settings = getMortgageSettings();
+  const summary = getMortgageSummary();
+  if (!settings || !summary) return null;
+  const loanIds = settings.loan_account_ids.split(',').map(Number).filter((n) => Number.isFinite(n));
+
+  const history = db.prepare(`
+    SELECT ls.snapshot_date AS date, SUM(ls.outstanding_cents) AS loanCents
+    FROM loan_snapshots ls
+    WHERE ls.account_id IN (${loanIds.map(() => '?').join(',')})
+    GROUP BY ls.snapshot_date
+    ORDER BY ls.snapshot_date
+  `).all(...loanIds) as { date: string; loanCents: number }[];
+
+  const offsetByDate = new Map<string, number>();
+  if (settings.offset_account_id !== null) {
+    const rows = db.prepare(`
+      SELECT balance_date AS date, balance_cents AS cents FROM account_balances WHERE account_id = ?
+    `).all(settings.offset_account_id) as { date: string; cents: number }[];
+    for (const r of rows) offsetByDate.set(r.date, r.cents);
+  }
+
+  // The PPOR itself: loan facilities are named '<property> (fixed|variable)'.
+  const propertyName = loanIds.length > 0
+    ? ((db.prepare(`SELECT name FROM accounts WHERE id = ?`).get(loanIds[0]) as { name: string } | undefined)
+        ?.name.replace(/\s*\((fixed|variable)\)\s*$/i, '') ?? null)
+    : null;
+  let propertyValueCents: number | null = null;
+  if (propertyName) {
+    const row = db.prepare(`
+      SELECT s.value_cents AS cents
+      FROM assets s JOIN accounts a ON s.account_id = a.id
+      WHERE a.name = ? ORDER BY s.valuation_date DESC LIMIT 1
+    `).get(propertyName) as { cents: number } | undefined;
+    propertyValueCents = row?.cents ?? null;
+  }
+
+  return {
+    settings,
+    summary,
+    history: history.map((h) => ({ ...h, offsetCents: offsetByDate.get(h.date) ?? null })),
+    propertyName,
+    propertyValueCents,
+  };
+}

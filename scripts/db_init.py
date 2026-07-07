@@ -222,6 +222,19 @@ CREATE TABLE IF NOT EXISTS net_worth_milestones (
     created_at      INTEGER NOT NULL
 );
 
+-- Singleton PPOR mortgage config for the /mortgage page: which loan accounts
+-- form the facility, the linked offset account, and the rate/repayment used
+-- in payoff projections. Seeded lazily by the dashboard from live data.
+CREATE TABLE IF NOT EXISTS mortgage_settings (
+    id                      INTEGER PRIMARY KEY CHECK (id = 1),
+    label                   TEXT NOT NULL DEFAULT 'Home Loan',
+    loan_account_ids        TEXT NOT NULL,      -- comma-separated accounts.id list
+    offset_account_id       INTEGER REFERENCES accounts(id),
+    annual_rate             REAL,               -- decimal, e.g. 0.0644
+    monthly_repayment_cents INTEGER,
+    updated_at              INTEGER NOT NULL
+);
+
 -- ── views ─────────────────────────────────────────────────────────────────────
 DROP VIEW IF EXISTS v_monthly_spend;
 CREATE VIEW v_monthly_spend AS

@@ -40,6 +40,7 @@ const navSections: NavSection[] = [
     heading: 'Wealth',
     items: [
       { href: '/networth', label: 'Net Worth' },
+      { href: '/mortgage', label: 'Mortgage' },
       { href: '/balance-sheet', label: 'Balance Sheet' },
     ],
   },
