@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import Link from 'next/link';
 import { setBudget } from '@/lib/actions';
 import { formatCurrency } from '@/lib/formatters';
 import type { BudgetRow } from '@/lib/db';
@@ -84,7 +85,14 @@ function BudgetRowCells({ row, month }: { row: BudgetRow; month: string }) {
 
   return (
     <tr className="hover:bg-slate-800/30 transition-colors">
-      <td className="px-6 py-2.5 text-slate-200">{row.category}</td>
+      <td className="px-6 py-2.5">
+        <Link
+          href={`/deep-dive?parent=${row.parent_id}&sub=${row.category_id}`}
+          className="text-slate-200 hover:text-white hover:underline underline-offset-2 transition-colors"
+        >
+          {row.category}
+        </Link>
+      </td>
       <td className="px-6 py-2.5 text-right tabular-nums text-slate-300">
         {formatCurrency(row.spent_cents)}
       </td>
@@ -142,10 +150,12 @@ export function BudgetEditor({ rows, month }: { rows: BudgetRow[]; month: string
       {groups.map((g) => (
         <div key={g.parentId} className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
-            <div className="flex items-center gap-2.5">
+            <Link href={`/deep-dive?parent=${g.parentId}`} className="flex items-center gap-2.5 group">
               <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: g.colour }} />
-              <h2 className="text-sm font-semibold text-slate-200">{g.parentName}</h2>
-            </div>
+              <h2 className="text-sm font-semibold text-slate-200 group-hover:text-white group-hover:underline underline-offset-2 transition-colors">
+                {g.parentName}
+              </h2>
+            </Link>
             <span className="text-xs tabular-nums text-slate-400">
               {formatCurrency(g.spentTotal)} / {g.budgetTotal > 0 ? formatCurrency(g.budgetTotal) : '—'}
             </span>
