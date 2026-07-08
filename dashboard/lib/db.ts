@@ -2241,3 +2241,199 @@ export function getMortgageData(): MortgageData | null {
     propertyValueCents,
   };
 }
+
+// ── Savings buckets (virtual envelopes over the offset balance) ─────────────
+
+/**
+ * Buckets are a virtual overlay: every real dollar stays in the AMP offset
+ * (it out-earns everything, tax-free), and each bucket tracks a slice of it.
+ * A bucket's balance is derived, never stored:
+ *   opening + monthly accrual × months elapsed − linked-category spend + adjustments
+ * Tables are lazy-created; three starter buckets are seeded (accrual $0) the
+ * first time so the page opens meaningful. Buckets are soft-deleted.
+ */
+function ensureBucketTables(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS savings_buckets (
+      id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+      name                  TEXT NOT NULL,
+      colour                TEXT NOT NULL DEFAULT '#3B82F6',
+      monthly_accrual_cents INTEGER NOT NULL DEFAULT 0,
+      target_cents          INTEGER,          -- optional goal
+      linked_parent_ids     TEXT NOT NULL DEFAULT '', -- CSV of parent categories.id whose spend deducts
+      start_date            TEXT NOT NULL,    -- YYYY-MM-DD, accrual begins this month
+      opening_balance_cents INTEGER NOT NULL DEFAULT 0,
+      is_active             INTEGER NOT NULL DEFAULT 1,
+      created_at            INTEGER NOT NULL,
+      updated_at            INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS bucket_adjustments (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      bucket_id       INTEGER NOT NULL REFERENCES savings_buckets(id),
+      adjustment_date TEXT NOT NULL,
+      amount_cents    INTEGER NOT NULL,       -- signed: + top-up, − withdrawal
+      note            TEXT,
+      created_at      INTEGER NOT NULL
+    );
+  `);
+
+  const count = (db.prepare(`SELECT COUNT(*) AS n FROM savings_buckets`).get() as { n: number }).n;
+  if (count > 0) return;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const monthStart = today.slice(0, 8) + '01';
+  const parentId = (name: string): number | null =>
+    (db.prepare(`SELECT id FROM categories WHERE name = ? AND parent_id IS NULL`).get(name) as { id: number } | undefined)?.id ?? null;
+  const travel = parentId('Travel');
+  const investments = parentId('Investments');
+
+  const insert = db.prepare(`
+    INSERT INTO savings_buckets (name, colour, linked_parent_ids, start_date, created_at, updated_at)
+    VALUES (?, ?, ?, ?, unixepoch(), unixepoch())
+  `);
+  insert.run('Holiday', '#14B8A6', travel !== null ? String(travel) : '', monthStart);
+  insert.run('Rainy Day Fund', '#F59E0B', '', monthStart);
+  insert.run('Investments', '#8B5CF6', investments !== null ? String(investments) : '', monthStart);
+}
+
+export interface SavingsBucketRow {
+  id: number;
+  name: string;
+  colour: string;
+  monthly_accrual_cents: number;
+  target_cents: number | null;
+  linked_parent_ids: string;
+  start_date: string;
+  opening_balance_cents: number;
+}
+
+export interface BucketDeduction {
+  transaction_date: string;
+  description: string;
+  merchant: string | null;
+  amount_cents: number;
+}
+
+export interface BucketWithBalance extends SavingsBucketRow {
+  monthsAccrued: number;
+  accruedCents: number;
+  deductedCents: number;   // positive total of linked spend
+  adjustedCents: number;   // signed sum of manual adjustments
+  balanceCents: number;
+  linkedParentNames: string[];
+  recentDeductions: BucketDeduction[];
+}
+
+export interface BucketsOverview {
+  buckets: BucketWithBalance[];
+  allocatedCents: number;      // sum of bucket balances
+  offsetCents: number | null;  // real cash backing the buckets
+  unallocatedCents: number | null;
+  monthlyAccrualCents: number;
+}
+
+/** Whole months from the start month through the current month (inclusive). */
+function monthsSince(startDate: string): number {
+  const [sy, sm] = startDate.split('-').map(Number);
+  const now = new Date();
+  const diff = (now.getFullYear() * 12 + now.getMonth() + 1) - (sy * 12 + sm) + 1;
+  return Math.max(0, diff);
+}
+
+export function getBucketsOverview(): BucketsOverview {
+  const db = getDb();
+  ensureBucketTables(db);
+
+  const rows = db.prepare(`
+    SELECT id, name, colour, monthly_accrual_cents, target_cents, linked_parent_ids,
+           start_date, opening_balance_cents
+    FROM savings_buckets WHERE is_active = 1 ORDER BY id
+  `).all() as SavingsBucketRow[];
+
+  const buckets: BucketWithBalance[] = rows.map((b) => {
+    const linkedIds = b.linked_parent_ids.split(',').map(Number).filter((n) => Number.isFinite(n) && n > 0);
+
+    let deductedCents = 0;
+    let recentDeductions: BucketDeduction[] = [];
+    let linkedParentNames: string[] = [];
+    if (linkedIds.length > 0) {
+      const ph = linkedIds.map(() => '?').join(',');
+      // Spend in linked categories since the bucket started. No is_transfer
+      // filter: an Investments bucket should drain on transfers to brokerage.
+      deductedCents = (db.prepare(`
+        SELECT COALESCE(ABS(SUM(amount_cents)), 0) AS t
+        FROM transactions
+        WHERE amount_cents < 0
+          AND transaction_date >= ?
+          AND (parent_category_id IN (${ph}) OR category_id IN (${ph}))
+      `).get(b.start_date, ...linkedIds, ...linkedIds) as { t: number }).t;
+      recentDeductions = db.prepare(`
+        SELECT transaction_date, description, merchant, amount_cents
+        FROM transactions
+        WHERE amount_cents < 0
+          AND transaction_date >= ?
+          AND (parent_category_id IN (${ph}) OR category_id IN (${ph}))
+        ORDER BY transaction_date DESC LIMIT 5
+      `).all(b.start_date, ...linkedIds, ...linkedIds) as BucketDeduction[];
+      linkedParentNames = (db.prepare(`
+        SELECT name FROM categories WHERE id IN (${ph}) ORDER BY name
+      `).all(...linkedIds) as { name: string }[]).map((r) => r.name);
+    }
+
+    const adjustedCents = (db.prepare(`
+      SELECT COALESCE(SUM(amount_cents), 0) AS t FROM bucket_adjustments WHERE bucket_id = ?
+    `).get(b.id) as { t: number }).t;
+
+    const monthsAccrued = monthsSince(b.start_date);
+    const accruedCents = b.monthly_accrual_cents * monthsAccrued;
+    const balanceCents = b.opening_balance_cents + accruedCents - deductedCents + adjustedCents;
+
+    return { ...b, monthsAccrued, accruedCents, deductedCents, adjustedCents, balanceCents, linkedParentNames, recentDeductions };
+  });
+
+  const allocatedCents = buckets.reduce((s, b) => s + b.balanceCents, 0);
+  const offsetCents = getMortgageSummary()?.offsetCents ?? null;
+
+  return {
+    buckets,
+    allocatedCents,
+    offsetCents,
+    unallocatedCents: offsetCents !== null ? offsetCents - allocatedCents : null,
+    monthlyAccrualCents: buckets.reduce((s, b) => s + b.monthly_accrual_cents, 0),
+  };
+}
+
+export function createBucket(name: string, colour: string, monthlyAccrualCents: number, targetCents: number | null, linkedParentIds: number[], openingBalanceCents: number): void {
+  const db = getDb();
+  ensureBucketTables(db);
+  const monthStart = new Date().toISOString().slice(0, 8) + '01';
+  db.prepare(`
+    INSERT INTO savings_buckets (name, colour, monthly_accrual_cents, target_cents, linked_parent_ids, start_date, opening_balance_cents, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, unixepoch(), unixepoch())
+  `).run(name, colour, monthlyAccrualCents, targetCents, linkedParentIds.join(','), monthStart, openingBalanceCents);
+}
+
+export function updateBucket(id: number, name: string, monthlyAccrualCents: number, targetCents: number | null, linkedParentIds: number[]): void {
+  const db = getDb();
+  ensureBucketTables(db);
+  db.prepare(`
+    UPDATE savings_buckets
+    SET name = ?, monthly_accrual_cents = ?, target_cents = ?, linked_parent_ids = ?, updated_at = unixepoch()
+    WHERE id = ?
+  `).run(name, monthlyAccrualCents, targetCents, linkedParentIds.join(','), id);
+}
+
+export function archiveBucket(id: number): void {
+  const db = getDb();
+  ensureBucketTables(db);
+  db.prepare(`UPDATE savings_buckets SET is_active = 0, updated_at = unixepoch() WHERE id = ?`).run(id);
+}
+
+export function addBucketAdjustment(bucketId: number, amountCents: number, note: string): void {
+  const db = getDb();
+  ensureBucketTables(db);
+  db.prepare(`
+    INSERT INTO bucket_adjustments (bucket_id, adjustment_date, amount_cents, note, created_at)
+    VALUES (?, ?, ?, ?, unixepoch())
+  `).run(bucketId, new Date().toISOString().slice(0, 10), amountCents, note || null);
+}

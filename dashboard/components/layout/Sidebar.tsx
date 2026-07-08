@@ -32,6 +32,7 @@ const navSections: NavSection[] = [
     heading: 'Planning',
     items: [
       { href: '/budget', label: 'Budget' },
+      { href: '/buckets', label: 'Savings Buckets' },
       { href: '/cashflow', label: 'Cash Flow' },
       { href: '/recurring', label: 'Recurring' },
     ],

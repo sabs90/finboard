@@ -222,6 +222,33 @@ CREATE TABLE IF NOT EXISTS net_worth_milestones (
     created_at      INTEGER NOT NULL
 );
 
+-- Virtual savings buckets (envelope-style sinking funds). Real dollars all
+-- sit in the AMP offset; a bucket's balance is DERIVED at read time:
+--   opening + monthly accrual × months since start − linked-category spend
+--   + manual adjustments.
+CREATE TABLE IF NOT EXISTS savings_buckets (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    name                  TEXT NOT NULL,
+    colour                TEXT NOT NULL DEFAULT '#3B82F6',
+    monthly_accrual_cents INTEGER NOT NULL DEFAULT 0,
+    target_cents          INTEGER,            -- optional goal
+    linked_parent_ids     TEXT NOT NULL DEFAULT '',  -- CSV categories.id; spend deducts
+    start_date            TEXT NOT NULL,      -- YYYY-MM-DD
+    opening_balance_cents INTEGER NOT NULL DEFAULT 0,
+    is_active             INTEGER NOT NULL DEFAULT 1,  -- soft delete
+    created_at            INTEGER NOT NULL,
+    updated_at            INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS bucket_adjustments (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    bucket_id       INTEGER NOT NULL REFERENCES savings_buckets(id),
+    adjustment_date TEXT NOT NULL,
+    amount_cents    INTEGER NOT NULL,          -- signed: + top-up, − withdrawal
+    note            TEXT,
+    created_at      INTEGER NOT NULL
+);
+
 -- Singleton PPOR mortgage config for the /mortgage page: which loan accounts
 -- form the facility, the linked offset account, and the rate/repayment used
 -- in payoff projections. Seeded lazily by the dashboard from live data.

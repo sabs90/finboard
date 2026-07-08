@@ -1,6 +1,6 @@
 # PROGRESS.md — Finboard Build Tracker
 
-Last updated: 2026-07-08 (Session 16)
+Last updated: 2026-07-09 (Session 17)
 
 ---
 
@@ -255,6 +255,26 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_loan_snapshots ON loan_snapshots(account_i
 ---
 
 ## Session Log
+
+### Session 17 — Savings buckets + UX fixes (2026-07-08/09)
+- **Savings buckets (`/buckets`, sidebar under Planning)** — virtual envelope/sinking-fund
+  layer over the AMP offset (user keeps all savings dollars there; buckets are accounting only).
+  Design decision: **fixed monthly accrual, not proportion-of-balance** (deterministic, matches
+  "allocate $x p.a." mental model; proportions fluctuate with unrelated spending). Balance is
+  derived at read time: opening + accrual×months − linked-category spend + manual adjustments.
+  - Tables `savings_buckets` + `bucket_adjustments` (lazy + db_init; soft-delete via is_active).
+    Seeded 3 starter buckets: Holiday (deducts Travel spend), Rainy Day Fund, Investments
+    (deducts Investments-category outflows — deduction query deliberately ignores is_transfer
+    so brokerage transfers drain the bucket).
+  - UI: KPI strip (allocated / offset backing / unallocated / monthly accrual committed) with
+    an amber over-allocation warning when buckets exceed real offset cash; bucket cards with
+    $/mo ↔ $/yr linked accrual inputs, optional target + progress bar + "reached ~Mon YYYY"
+    pace projection, linked-category chips, recent deductions list, manual +add/−withdraw
+    adjustments with notes, edit/archive. Verified balance math on live data ($500/mo from
+    Apr = $2,000 at Jul; test values reverted). Partially delivers R2.7 #1 (sinking funds).
+- **Deep dive defaults to 3M** (was This Month — partial month reads as $0).
+- **Number-input spinners hidden globally** (globals.css).
+- **Budget page**: subcategory rows + parent group headers now link to their deep dive.
 
 ### Session 16 — PPOR mortgage page + overview net-loan line (2026-07-08)
 User request: PPOR mortgage on Overview (AMP loan net of AMP offset) + a dedicated /mortgage
